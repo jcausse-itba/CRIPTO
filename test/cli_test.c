@@ -135,14 +135,11 @@ void test_default_values() {
 }
 
 int main() {
-    printf("Running CLI tests...\n");
-    
     test_basic_parsing();
     test_missing_required();
     test_float_and_path();
     test_invalid_types();
     test_default_values();
     
-    printf("Finished running CLI tests.\n");
-    return 0;
+    return ASSERT_REPORT();
 }

@@ -13,17 +13,20 @@ PROJ_SRCS := $(filter-out $(SRCDIR)/main.c,$(wildcard $(SRCDIR)/*.c))
 .PHONY: all clean
 
 all: $(TEST_BINS)
+	@printf "\n\n"
 	@for bin in $(TEST_BINS); do \
 		echo "========== Running $$bin =========="; \
 		./$$bin; \
 		status=$$?; \
 		if [ $$status -ne 0 ]; then \
 			echo "FAILED (exit code $$status)"; \
+			printf "\n\n"; \
 			exit $$status; \
 		fi; \
 		echo ""; \
 	done
 	@echo "All tests passed."
+	@printf "\n\n"
 
 $(BUILDDIR)/%: %.c $(PROJ_SRCS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) -o $@ $< $(PROJ_SRCS)

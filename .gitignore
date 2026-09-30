@@ -98,3 +98,6 @@ $RECYCLE.BIN/
 
 # CLion
 .idea/
+
+# Test builds
+test/build/
