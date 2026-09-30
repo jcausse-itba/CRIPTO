@@ -14,8 +14,29 @@
 
 - [Instrucciones de Compilación](#instrucciones-de-compilacion)
 - [Instrucciones de Ejecución](#instrucciones-de-ejecucion)
+- [Instrucciones de Testing](#instrucciones-de-testing)
 
 ## Instrucciones de Compilación
 
+Debe contar con:
+- `GCC` (versión 14 o superior)
+- `make`
+
+Para compilar el proyecto, posicionarse en la raíz del proyecto y ejecutar:
+
+```shell
+make
+```
+
 ## Instrucciones de Ejecución
 
+TODO
+
+## Instrucciones de Testing
+
+Para ejecutar todos los tests de manera automática, posicionarse en la raíz del proyecto y ejecutar:
+
+
+```shell
+make test
+```
