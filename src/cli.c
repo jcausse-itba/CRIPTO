@@ -65,12 +65,12 @@ static size_t strip_leading_dashes(char *buf, size_t buf_size) {
     }
 
     if (start == 0) {
-        return strnlen(buf, buf_size);
+        return strlen(buf);
     }
 
     // buf[start] is either '\0' (all-dashes) or the first real char.
     // In either case memmove produces a valid C string.
-    size_t remaining = strnlen(buf + start, buf_size - start); // safe: start <= buf_size and we hit '-' or '\0'
+    size_t remaining = strlen(buf + start);
     memmove(buf, buf + start, remaining + 1);
     return remaining;
 }
