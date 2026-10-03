@@ -70,10 +70,8 @@ static int _assert_failed = 0;
 
 #define ASSERT_REPORT() _assert_report()
 
-static inline int _assert_report(void) {
-    fprintf(stderr, "\nResults: %d ran, %d passed, %d %s\n",
-            _assert_total, _assert_passed, _assert_failed,
-            _assert_failed > 0 ? "FAILED" : "passed");
+static int _assert_report() {
+    fprintf(stderr, "\nResults: %d ran, %d passed, %d failed\n", _assert_total, _assert_passed, _assert_failed);
     return _assert_failed > 0 ? 1 : 0;
 }
 
