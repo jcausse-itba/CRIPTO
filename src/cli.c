@@ -247,7 +247,7 @@ static void build_getopt_tables(const cli c, struct option * long_options, char 
 /*************************************************************************/
 
 cli cli_create(void) {
-    cli c = calloc(1, sizeof(cli_internal));
+    cli c = calloc(1, sizeof(struct cli_internal));
     if (!c) return NULL;
 
     c->map = HashMap_create(string_hash_fn, string_equals_fn);

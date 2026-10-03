@@ -1,8 +1,6 @@
 #ifndef CLI_H
 #define CLI_H
 
-#include <stdbool.h>
-
 /**
  * @brief Maximum length for a short option name (including null terminator).
  */
@@ -18,9 +16,7 @@
 /**
  * @brief CLI parser instance.
  */
-struct cli_internal;
-typedef struct cli_internal cli_internal;
-typedef cli_internal * cli;
+typedef struct cli_internal * cli;
 
 /**
  * @brief Supported types for command line options.
