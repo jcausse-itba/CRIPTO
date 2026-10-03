@@ -98,6 +98,11 @@ $RECYCLE.BIN/
 
 # CLion
 .idea/
+cmake-build-*/
 
-# Test builds
+# Build artifacts
+build/
 test/build/
+stegobmp
+*.o
+*.a

@@ -1,25 +1,17 @@
-CC := gcc
-CFLAGS := -Wall -Wextra -Werror -pedantic -std=c23 -g -fsanitize=address,undefined -Iinclude
-EXEC := stegobmp
+BUILD_DIR ?= build
 
 .PHONY: all clean test
 
-all: $(EXEC)
-
-clean:
-	rm -f $(EXEC) > /dev/null 2>&1
-	rm -f *.o > /dev/null 2>&1
-	$(MAKE) -C test clean
+all:
+	@cmake -B $(BUILD_DIR) -S .
+	@cmake --build $(BUILD_DIR) --target stegobmp
+	@cp -f $(BUILD_DIR)/stegobmp .
 
 test:
-	$(MAKE) -C test
+	@cmake -B $(BUILD_DIR) -S .
+	@cmake --build $(BUILD_DIR)
+	@ctest --test-dir $(BUILD_DIR) --output-on-failure
 
-#################################################################################################
-
-OBJS := main.o
-
-$(EXEC): $(OBJS)
-	$(CC) $(CFLAGS) -o $(EXEC) $(OBJS)
-
-main.o: src/main.c
-	$(CC) $(CFLAGS) -c src/main.c
+clean:
+	@rm -rf $(BUILD_DIR) stegobmp *.o
+	@$(MAKE) -C test clean > /dev/null 2>&1 || true
