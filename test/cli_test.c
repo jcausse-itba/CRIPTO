@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
-void test_basic_parsing() {
+static void test_basic_parsing() {
     cli c = cli_create();
     
     cli_option opt_int = {
@@ -40,7 +40,7 @@ void test_basic_parsing() {
     cli_destroy(c);
 }
 
-void test_missing_required() {
+static void test_missing_required() {
     cli c = cli_create();
     cli_option opt_int = {
         .option_name_short = "i",
@@ -57,9 +57,9 @@ void test_missing_required() {
     cli_destroy(c);
 }
 
-void test_float_and_path() {
+static void test_float_and_path() {
     cli c = cli_create();
-    
+
     cli_option opt_float = {
         .option_name_short = "f",
         .option_name_long = "float",
@@ -92,7 +92,7 @@ void test_float_and_path() {
     cli_destroy(c);
 }
 
-void test_invalid_types() {
+static void test_invalid_types() {
     cli c = cli_create();
     
     cli_option opt_int = {
@@ -111,7 +111,7 @@ void test_invalid_types() {
     cli_destroy(c);
 }
 
-void test_default_values() {
+static void test_default_values() {
     cli c = cli_create();
     
     cli_option opt_int = {
