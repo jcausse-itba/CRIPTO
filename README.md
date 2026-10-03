@@ -19,14 +19,36 @@
 ## Instrucciones de Compilación
 
 Debe contar con:
-- `GCC` (versión 14 o superior)
+- `GCC` (versión 14 o superior con soporte para C23)
 - `make`
+- `CMake` (versión 3.21 o superior)
 
-Para compilar el proyecto, posicionarse en la raíz del proyecto y ejecutar:
+<details><summary>Desplegar para ver instrucciones de instalación</summary>
 
+Puede instalar estas dependencias en distribuciones basadas en Debian/Ubuntu mediante:
+```shell
+sudo apt update -y && sudo apt install -y gcc make cmake
+```
+
+</details>
+
+Si cuenta con dichas dependencias, simplemente ejecute:
 ```shell
 make
 ```
+
+<details><summary>Desplegar para ver otras opciones de compilación</summary>
+
+### CLion
+Simplemente abra el directorio del proyecto en CLion. Al detectar `CMakeLists.txt`, CLion configurará el proyecto automáticamente y creará los perfiles de compilación y ejecución para `stegobmp` y los tests.
+
+### CMake por línea de comandos
+```shell
+cmake -B build
+cmake --build build
+```
+
+</details>
 
 ## Instrucciones de Ejecución
 
@@ -34,9 +56,7 @@ TODO
 
 ## Instrucciones de Testing
 
-Para ejecutar todos los tests de manera automática, posicionarse en la raíz del proyecto y ejecutar:
-
-
+Para ejecutar todos los tests de manera automática, ejecute:
 ```shell
 make test
 ```
