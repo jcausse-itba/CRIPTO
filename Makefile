@@ -14,4 +14,5 @@ test:
 
 clean:
 	@rm -rf $(BUILD_DIR) stegobmp *.o
+	@rm -rf ./cmake-build-debug
 	@$(MAKE) -C test clean > /dev/null 2>&1 || true
