@@ -12,9 +12,15 @@
 
 ## Contenido
 
+- [Tecnologías Utilizadas](#tecnologías-utilizadas)
 - [Instrucciones de Compilación](#instrucciones-de-compilacion)
 - [Instrucciones de Ejecución](#instrucciones-de-ejecucion)
 - [Instrucciones de Testing](#instrucciones-de-testing)
+
+## Tecnologías Utilizadas
+
+- C23 (ISO/IEC 9899:2024)
+- Librería OpenSSL
 
 ## Instrucciones de Compilación
 

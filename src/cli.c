@@ -2,7 +2,6 @@
 #include "hashmap.h"
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <getopt.h>
 #include <regex.h>
 
@@ -14,11 +13,7 @@ typedef struct {
     cli_option def;
     bool is_set;
     bool owns_string;               // true if parsed_value.string_value was strdup'd and must be freed
-    union {
-        long long_value;
-        double double_value;
-        char * string_value;
-    } parsed_value;
+    cli_option_value parsed_value;
 } cli_option_internal;
 
 struct cli_internal {
@@ -31,19 +26,19 @@ struct cli_internal {
 /*                          HashMap callbacks                            */
 /*************************************************************************/
 
-static uint32_t string_hash_fn(const HashMapKey key, const size_t hash_table_size) {
+static uint32_t string_hash_fn(HashMapKey key, size_t hash_table_size) {
     const char *str = key;
     uint32_t hash = 5381;
     int c;
-    while ((c = *str++)) {
+    while ((c = (unsigned char) *str++)) {
         hash = ((hash << 5) + hash) + c;
     }
     return hash % hash_table_size;
 }
 
-static bool string_equals_fn(const HashMapKey key1, const HashMapKey key2) {
+static bool string_equals_fn(HashMapKey key1, HashMapKey key2) {
     if (!key1 || !key2) return false;
-    return strcmp(key1, key2) == 0;
+    return strncmp(key1, key2, CLI_MAX_LONG_OPTION_NAME) == 0;
 }
 
 /*************************************************************************/
@@ -70,7 +65,7 @@ static size_t strip_leading_dashes(char *buf, size_t buf_size) {
 
     // buf[start] is either '\0' (all-dashes) or the first real char.
     // In either case memmove produces a valid C string.
-    size_t remaining = strlen(buf + start);
+    const size_t remaining = strlen(buf + start);
     memmove(buf, buf + start, remaining + 1);
     return remaining;
 }
@@ -106,7 +101,7 @@ static bool parse_float(const char * str, double * out) {
 static bool validate_path(const char * str) {
     regex_t regex;
     if (regcomp(&regex, PATH_REGEX, REG_EXTENDED | REG_NOSUB) != 0) return false;
-    bool ok = regexec(&regex, str, 0, NULL, 0) == 0;
+    bool ok = regexec(&regex, str, 0, nullptr, 0) == 0;
     regfree(&regex);
     return ok;
 }
@@ -114,9 +109,9 @@ static bool validate_path(const char * str) {
 /**
  * @brief Assign a long value to an option.
  */
-static bool set_long_value(cli_option_internal * opt, const char * optarg) {
+static bool set_long_value(cli_option_internal * opt, const char * arg) {
     long val;
-    if (!parse_integer(optarg, &val)) return false;
+    if (!parse_integer(arg, &val)) return false;
     opt->parsed_value.long_value = val;
     opt->is_set = true;
     return true;
@@ -125,9 +120,9 @@ static bool set_long_value(cli_option_internal * opt, const char * optarg) {
 /**
  * @brief Assign a double value to an option.
  */
-static bool set_double_value(cli_option_internal * opt, const char * optarg) {
+static bool set_double_value(cli_option_internal * opt, const char * arg) {
     double val;
-    if (!parse_float(optarg, &val)) return false;
+    if (!parse_float(arg, &val)) return false;
     opt->parsed_value.double_value = val;
     opt->is_set = true;
     return true;
@@ -137,8 +132,8 @@ static bool set_double_value(cli_option_internal * opt, const char * optarg) {
  * @brief Assign a string value to an option, freeing any previously owned string.
  * @return true on success, false if strdup fails (OOM).
  */
-static bool set_string_value(cli_option_internal * opt, const char * optarg, bool owned) {
-    char * value = owned ? strdup(optarg) : (char *) optarg;
+static bool set_string_value(cli_option_internal * opt, const char * arg, bool owned) {
+    char * value = owned ? strdup(arg) : (char *) arg;
     if (owned && !value) return false;
     if (opt->owns_string && opt->parsed_value.string_value) {
         free(opt->parsed_value.string_value);
@@ -153,20 +148,20 @@ static bool set_string_value(cli_option_internal * opt, const char * optarg, boo
  * @brief Parse and assign optarg to the matched option according to its type.
  * @return true on success, false on type mismatch or validation error.
  */
-static bool assign_optarg(cli_option_internal * opt, const char * optarg) {
+static bool assign_optarg(cli_option_internal * opt, const char * arg) {
     switch (opt->def.type) {
         case CLI_TYPE_INTEGER: {
-            return set_long_value(opt, optarg);
+            return set_long_value(opt, arg);
         }
         case CLI_TYPE_FLOAT: {
-            return set_double_value(opt, optarg);
+            return set_double_value(opt, arg);
         }
         case CLI_TYPE_STRING: {
-            return set_string_value(opt, optarg, true);
+            return set_string_value(opt, arg, true);
         }
         case CLI_TYPE_PATH: {
-            if (!validate_path(optarg)) return false;
-            return set_string_value(opt, optarg, true);
+            if (!validate_path(arg)) return false;
+            return set_string_value(opt, arg, true);
         }
     }
     return false;
@@ -197,13 +192,13 @@ static void apply_default(cli_option_internal *opt) {
  * @brief Look up an option in the hashmap by name.
  * @return Pointer to the internal option, or NULL if not found.
  */
-static cli_option_internal * lookup_option(const cli c, const char * name) {
-    if (!c || !name) return NULL;
-    cli_option_internal * opt = NULL;
+static cli_option_internal * lookup_option(cli c, const char * name) {
+    if (!c || !name) return nullptr;
+    cli_option_internal * opt = nullptr;
     if (HashMap_peek(c->map, (HashMapKey) name, (HashMapValue *) &opt) == HASHMAP_OK) {
         return opt;
     }
-    return NULL;
+    return nullptr;
 }
 
 /**
@@ -213,7 +208,7 @@ static cli_option_internal * lookup_option(const cli c, const char * name) {
  * @param long_options   Output: caller-allocated array of size (option_count + 1).
  * @param short_options  Output: caller-allocated buffer of size (MAX_OPTIONS * 3 + 2).
  */
-static void build_getopt_tables(const cli c, struct option * long_options, char * short_options) {
+static void build_getopt_tables(cli c, struct option * long_options, char * short_options) {
     int long_idx = 0;
     int short_idx = 0;
 
@@ -225,7 +220,7 @@ static void build_getopt_tables(const cli c, struct option * long_options, char 
         if (def->option_name_long[0] != '\0') {
             long_options[long_idx].name     = def->option_name_long;
             long_options[long_idx].has_arg  = required_argument;
-            long_options[long_idx].flag     = NULL;
+            long_options[long_idx].flag     = nullptr;
             long_options[long_idx].val      = def->option_name_short[0] != '\0'
                                               ? (unsigned char)def->option_name_short[0]
                                               : 0;
@@ -246,14 +241,14 @@ static void build_getopt_tables(const cli c, struct option * long_options, char 
 /*                          Public API                                   */
 /*************************************************************************/
 
-cli cli_create(void) {
+cli cli_create() {
     cli c = calloc(1, sizeof(struct cli_internal));
-    if (!c) return NULL;
+    if (!c) return nullptr;
 
     c->map = HashMap_create(string_hash_fn, string_equals_fn);
     if (!c->map) {
         free(c);
-        return NULL;
+        return nullptr;
     }
     return c;
 }
@@ -269,17 +264,17 @@ void cli_destroy(cli c) {
     }
 
     if (c->map) {
-        HashMap_cleanup(c->map, NULL);
+        HashMap_cleanup(c->map, nullptr);
     }
     free(c);
 }
 
-bool cli_add_option(const cli c, cli_option o) {
+bool cli_add_option(cli c, cli_option o) {
     if (!c || c->option_count >= MAX_OPTIONS) return false;
 
     // Strip leading dashes — returns 0 for empty or all-dashes names
-    strip_leading_dashes(o.option_name_short, MAX_SHORT_NAME);
-    strip_leading_dashes(o.option_name_long, MAX_LONG_NAME);
+    strip_leading_dashes(o.option_name_short, CLI_MAX_SHORT_OPTION_NAME);
+    strip_leading_dashes(o.option_name_long, CLI_MAX_LONG_OPTION_NAME);
 
     // At least one name must be non-empty
     if (o.option_name_short[0] == '\0' && o.option_name_long[0] == '\0') return false;
@@ -301,7 +296,7 @@ bool cli_add_option(const cli c, cli_option o) {
     return true;
 }
 
-bool cli_parse(const cli c, int argc, const char *argv[]) {
+bool cli_parse(cli c, int argc, const char *argv[]) {
     if (!c || !argv || argc < 1) return false;
 
     // getopt_long may permute argv, so work on a mutable copy
@@ -343,7 +338,7 @@ bool cli_parse(const cli c, int argc, const char *argv[]) {
         }
 
         // Resolve the matched option via the hashmap
-        cli_option_internal * found = NULL;
+        cli_option_internal * found = nullptr;
         if (opt_val == 0) {
             // Long-only option (no short alias): use name from long_options table
             found = lookup_option(c, long_options[option_index].name);
@@ -379,21 +374,21 @@ bool cli_parse(const cli c, int argc, const char *argv[]) {
     return success;
 }
 
-bool cli_get_integer(const cli c, const char * name, long * out_value) {
+bool cli_get_integer(cli c, const char * name, long * out_value) {
     cli_option_internal * opt = lookup_option(c, name);
     if (!opt || !opt->is_set || opt->def.type != CLI_TYPE_INTEGER) return false;
     if (out_value) *out_value = opt->parsed_value.long_value;
     return true;
 }
 
-bool cli_get_float(const cli c, const char * name, double * out_value) {
+bool cli_get_float(cli c, const char * name, double * out_value) {
     cli_option_internal * opt = lookup_option(c, name);
     if (!opt || !opt->is_set || opt->def.type != CLI_TYPE_FLOAT) return false;
     if (out_value) *out_value = opt->parsed_value.double_value;
     return true;
 }
 
-bool cli_get_string(const cli c, const char * name, const char ** out_value) {
+bool cli_get_string(cli c, const char * name, const char ** out_value) {
     cli_option_internal * opt = lookup_option(c, name);
     if (!opt || !opt->is_set) return false;
     if (opt->def.type != CLI_TYPE_STRING && opt->def.type != CLI_TYPE_PATH) return false;
