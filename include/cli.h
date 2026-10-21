@@ -24,17 +24,20 @@ typedef struct cli_internal * cli;
 typedef enum {
     CLI_TYPE_INTEGER,   // Long integer type.
     CLI_TYPE_FLOAT,     // Double-precision floating point type.
-    CLI_TYPE_STRING,    // String type (char *). */
-    CLI_TYPE_PATH       // File path type, validated using a regex.
+    CLI_TYPE_STRING,    // String type (char *).
+    CLI_TYPE_PATH,      // File path type, validated using a regex.
+    CLI_TYPE_FLAG,      // Boolean flag type (no argument).
+    CLI_TYPE_CHOICE     // String choice type, validated against a NULL-terminated array of allowed values.
 } cli_option_type;
 
 /**
- * @brief Union holding the default value for an option.
+ * @brief Union holding the value for an option.
  */
 typedef union {
-    long    long_value;     // Default value for integer options.
-    double  double_value;   // Default value for float options.
-    char *  string_value;   // Default value for string and path options.
+    long    long_value;     // Value for integer options.
+    double  double_value;   // Value for float options.
+    char *  string_value;   // Value for string, path, and choice options.
+    bool    bool_value;     // Value for flag options (parsed value only; flags always default to false).
 } cli_option_value;
 
 /**
@@ -45,7 +48,8 @@ typedef struct {
     char                    option_name_long[CLI_MAX_LONG_OPTION_NAME];    // Long option name, e.g., "alpha" or "--alpha".
     cli_option_type         type;                               // Data type expected for the option's argument.
     bool                    required;                           // True if the option must be provided by the user.
-    cli_option_value        default_value;                      // Default value if the option is not provided (unused if required is true).
+    cli_option_value        default_value;                      // Default value if the option is not provided (unused if required is true or for flags).
+    const char **           choices;                            // NULL-terminated array of valid strings for CLI_TYPE_CHOICE options.
 } cli_option;
 
 //------------------------------------------------------------------------------------------------------------------------------------------
@@ -106,13 +110,23 @@ bool cli_get_integer(cli c, const char *name, long *out_value);
 bool cli_get_float(cli c, const char *name, double *out_value);
 
 /**
- * @brief Retrieves the parsed string or path value for a given option.
+ * @brief Retrieves the parsed string, path, or choice value for a given option.
  * 
  * @param c The CLI parser.
  * @param name The short or long name of the option.
  * @param out_value Pointer to store the parsed string pointer.
- * @return true if the option was set and is of type string/path, false otherwise.
+ * @return true if the option was set and is of type string/path/choice, false otherwise.
  */
 bool cli_get_string(cli c, const char *name, const char **out_value);
+
+/**
+ * @brief Retrieves the parsed boolean value for a given flag option.
+ * 
+ * @param c The CLI parser.
+ * @param name The short or long name of the option.
+ * @param out_value Pointer to store the parsed boolean value.
+ * @return true if the option was set and is of type flag, false otherwise.
+ */
+bool cli_get_flag(cli c, const char *name, bool *out_value);
 
 #endif // CLI_H

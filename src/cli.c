@@ -107,6 +107,20 @@ static bool validate_path(const char * str) {
 }
 
 /**
+ * @brief Validate a string against a NULL-terminated array of allowed choices.
+ * @return true if the string matches one of the choices, false otherwise.
+ */
+static bool validate_choice(const char * str, const char ** choices) {
+    if (!str || !choices) return false;
+    for (size_t i = 0; choices[i] != nullptr; i++) {
+        if (strcmp(str, choices[i]) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * @brief Assign a long value to an option.
  */
 static bool set_long_value(cli_option_internal * opt, const char * arg) {
@@ -145,10 +159,21 @@ static bool set_string_value(cli_option_internal * opt, const char * arg, bool o
 }
 
 /**
+ * @brief Assign a boolean value to a flag option.
+ */
+static bool set_bool_value(cli_option_internal * opt, bool val) {
+    opt->parsed_value.bool_value = val;
+    opt->is_set = true;
+    return true;
+}
+
+/**
  * @brief Parse and assign optarg to the matched option according to its type.
  * @return true on success, false on type mismatch or validation error.
  */
 static bool assign_optarg(cli_option_internal * opt, const char * arg) {
+    if (opt->def.type != CLI_TYPE_FLAG && !arg) return false;
+
     switch (opt->def.type) {
         case CLI_TYPE_INTEGER: {
             return set_long_value(opt, arg);
@@ -161,6 +186,13 @@ static bool assign_optarg(cli_option_internal * opt, const char * arg) {
         }
         case CLI_TYPE_PATH: {
             if (!validate_path(arg)) return false;
+            return set_string_value(opt, arg, true);
+        }
+        case CLI_TYPE_FLAG: {
+            return set_bool_value(opt, true);
+        }
+        case CLI_TYPE_CHOICE: {
+            if (!validate_choice(arg, opt->def.choices)) return false;
             return set_string_value(opt, arg, true);
         }
     }
@@ -178,9 +210,14 @@ static void apply_default(cli_option_internal *opt) {
         case CLI_TYPE_FLOAT:
             opt->parsed_value.double_value = opt->def.default_value.double_value;
             break;
+        case CLI_TYPE_FLAG:
+            opt->parsed_value.bool_value = false;
+            break;
         case CLI_TYPE_STRING:
         /* fallthrough */
         case CLI_TYPE_PATH:
+        /* fallthrough */
+        case CLI_TYPE_CHOICE:
             // Points to the caller's string — not owned by us
             set_string_value(opt, opt->def.default_value.string_value, false);
             return;     // set_string_value already sets is_set to true, so we return early
@@ -216,10 +253,11 @@ static void build_getopt_tables(cli c, struct option * long_options, char * shor
 
     for (size_t i = 0; i < c->option_count; i++) {
         const cli_option * def = &(c->options[i].def);
+        const bool is_flag = (def->type == CLI_TYPE_FLAG);
 
         if (def->option_name_long[0] != '\0') {
             long_options[long_idx].name     = def->option_name_long;
-            long_options[long_idx].has_arg  = required_argument;
+            long_options[long_idx].has_arg  = is_flag ? no_argument : required_argument;
             long_options[long_idx].flag     = nullptr;
             long_options[long_idx].val      = def->option_name_short[0] != '\0'
                                               ? (unsigned char)def->option_name_short[0]
@@ -229,7 +267,9 @@ static void build_getopt_tables(cli c, struct option * long_options, char * shor
 
         if (def->option_name_short[0] != '\0') {
             short_options[short_idx++] = def->option_name_short[0];
-            short_options[short_idx++] = ':';
+            if (!is_flag) {
+                short_options[short_idx++] = ':';
+            }
         }
     }
 
@@ -271,6 +311,9 @@ void cli_destroy(cli c) {
 
 bool cli_add_option(cli c, cli_option o) {
     if (!c || c->option_count >= MAX_OPTIONS) return false;
+
+    // Choice options must provide a non-empty NULL-terminated array of allowed choices
+    if (o.type == CLI_TYPE_CHOICE && (!o.choices || !o.choices[0])) return false;
 
     // Strip leading dashes — returns 0 for empty or all-dashes names
     strip_leading_dashes(o.option_name_short, CLI_MAX_SHORT_OPTION_NAME);
@@ -348,7 +391,7 @@ bool cli_parse(cli c, int argc, const char *argv[]) {
             found = lookup_option(c, short_name);
         }
 
-        if (found && optarg && !assign_optarg(found, optarg)) {
+        if (found && !assign_optarg(found, optarg)) {
             success = false;
         }
     }
@@ -391,7 +434,14 @@ bool cli_get_float(cli c, const char * name, double * out_value) {
 bool cli_get_string(cli c, const char * name, const char ** out_value) {
     cli_option_internal * opt = lookup_option(c, name);
     if (!opt || !opt->is_set) return false;
-    if (opt->def.type != CLI_TYPE_STRING && opt->def.type != CLI_TYPE_PATH) return false;
+    if (opt->def.type != CLI_TYPE_STRING && opt->def.type != CLI_TYPE_PATH && opt->def.type != CLI_TYPE_CHOICE) return false;
     if (out_value) *out_value = opt->parsed_value.string_value;
+    return true;
+}
+
+bool cli_get_flag(cli c, const char * name, bool * out_value) {
+    cli_option_internal * opt = lookup_option(c, name);
+    if (!opt || !opt->is_set || opt->def.type != CLI_TYPE_FLAG) return false;
+    if (out_value) *out_value = opt->parsed_value.bool_value;
     return true;
 }
