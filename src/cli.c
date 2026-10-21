@@ -335,11 +335,16 @@ bool cli_add_option(cli c, cli_option o) {
     if (o.type == CLI_TYPE_CHOICE && (!o.choices || !o.choices[0])) return false;
 
     // Strip leading dashes — returns 0 for empty or all-dashes names
-    strip_leading_dashes(o.option_name_short, CLI_MAX_SHORT_OPTION_NAME);
-    strip_leading_dashes(o.option_name_long, CLI_MAX_LONG_OPTION_NAME);
+    const size_t short_len = strip_leading_dashes(o.option_name_short, CLI_MAX_SHORT_OPTION_NAME);
+    const size_t long_len  = strip_leading_dashes(o.option_name_long, CLI_MAX_LONG_OPTION_NAME);
 
-    // At least one name must be non-empty
-    if (o.option_name_short[0] == '\0' && o.option_name_long[0] == '\0') return false;
+    // Short option name must be at most 1 character, and at least one name must be non-empty
+    if (short_len > 1 || (short_len == 0 && long_len == 0)) return false;
+
+    // Reject duplicate option names (including short/long collision within the same option)
+    if (short_len > 0 && long_len > 0 && strcmp(o.option_name_short, o.option_name_long) == 0) return false;
+    if (short_len > 0 && HashMap_contains(c->map, o.option_name_short)) return false;
+    if (long_len > 0 && HashMap_contains(c->map, o.option_name_long)) return false;
 
     cli_option_internal * opt = &c->options[c->option_count];
     opt->def = o;
@@ -347,11 +352,18 @@ bool cli_add_option(cli c, cli_option o) {
     opt->owns_string = false;
 
     // Register both name forms in the hashmap
-    if (o.option_name_short[0] != '\0') {
-        HashMap_put(c->map, (HashMapKey) opt->def.option_name_short, (HashMapValue) opt);
+    if (short_len > 0) {
+        if (HashMap_put(c->map, (HashMapKey) opt->def.option_name_short, (HashMapValue) opt) != HASHMAP_OK) {
+            return false;
+        }
     }
-    if (o.option_name_long[0] != '\0') {
-        HashMap_put(c->map, (HashMapKey) opt->def.option_name_long, (HashMapValue) opt);
+    if (long_len > 0) {
+        if (HashMap_put(c->map, (HashMapKey) opt->def.option_name_long, (HashMapValue) opt) != HASHMAP_OK) {
+            if (short_len > 0) {
+                HashMap_pop(c->map, (HashMapKey) opt->def.option_name_short, nullptr);
+            }
+            return false;
+        }
     }
 
     c->option_count++;

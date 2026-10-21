@@ -272,6 +272,39 @@ static void test_invalid_choice() {
     cli_destroy(c);
 }
 
+static void test_duplicate_and_invalid_option_names() {
+    cli c = cli_create();
+
+    cli_option opt_too_long_short = {
+        .option_name_short = "ab",
+        .type = CLI_TYPE_FLAG
+    };
+    ASSERT_MSG(!cli_add_option(c, opt_too_long_short), "Short option name > 1 char should fail");
+
+    cli_option opt_first = {
+        .option_name_short = "a",
+        .option_name_long = "alpha",
+        .type = CLI_TYPE_FLAG
+    };
+    ASSERT_MSG(cli_add_option(c, opt_first), "First valid option should succeed");
+
+    cli_option opt_dup_short = {
+        .option_name_short = "-a",
+        .option_name_long = "another",
+        .type = CLI_TYPE_FLAG
+    };
+    ASSERT_MSG(!cli_add_option(c, opt_dup_short), "Duplicate short option name should fail");
+
+    cli_option opt_dup_long = {
+        .option_name_short = "b",
+        .option_name_long = "--alpha",
+        .type = CLI_TYPE_FLAG
+    };
+    ASSERT_MSG(!cli_add_option(c, opt_dup_long), "Duplicate long option name should fail");
+
+    cli_destroy(c);
+}
+
 int main() {
     test_basic_parsing();
     test_missing_required();
@@ -281,6 +314,7 @@ int main() {
     test_flag_options();
     test_choice_options();
     test_invalid_choice();
+    test_duplicate_and_invalid_option_names();
     
     return ASSERT_REPORT();
 }
