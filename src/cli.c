@@ -239,7 +239,7 @@ static bool assign_optarg(cli c, cli_option_internal * opt, const char * arg) {
         }
         case CLI_TYPE_STRING: {
             if (!set_string_value(opt, arg, true)) {
-                set_error(c, CLI_PARSE_ERROR_MEMORY, name);
+                set_error(c, CLI_PARSE_ERROR_OTHER, name);
                 return false;
             }
             return true;
@@ -250,7 +250,7 @@ static bool assign_optarg(cli c, cli_option_internal * opt, const char * arg) {
                 return false;
             }
             if (!set_string_value(opt, arg, true)) {
-                set_error(c, CLI_PARSE_ERROR_MEMORY, name);
+                set_error(c, CLI_PARSE_ERROR_OTHER, name);
                 return false;
             }
             return true;
@@ -264,7 +264,7 @@ static bool assign_optarg(cli c, cli_option_internal * opt, const char * arg) {
                 return false;
             }
             if (!set_string_value(opt, arg, true)) {
-                set_error(c, CLI_PARSE_ERROR_MEMORY, name);
+                set_error(c, CLI_PARSE_ERROR_OTHER, name);
                 return false;
             }
             return true;
@@ -513,7 +513,7 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown) {
     c->error_option[0] = '\0';
 
     if (!argv || argc < 1) {
-        set_error(c, CLI_PARSE_ERROR_MEMORY, nullptr);
+        set_error(c, CLI_PARSE_ERROR_OTHER, nullptr);
         return false;
     }
 
@@ -524,7 +524,7 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown) {
     // getopt_long_only may permute argv, so work on a mutable copy
     char **argv_copy = malloc(argc * sizeof(char *));
     if (!argv_copy) {
-        set_error(c, CLI_PARSE_ERROR_MEMORY, nullptr);
+        set_error(c, CLI_PARSE_ERROR_OTHER, nullptr);
         return false;
     }
     for (int i = 0; i < argc; i++) {
@@ -532,7 +532,7 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown) {
         if (!argv_copy[i]) {
             for (int j = 0; j < i; j++) free(argv_copy[j]);
             free(argv_copy);
-            set_error(c, CLI_PARSE_ERROR_MEMORY, nullptr);
+            set_error(c, CLI_PARSE_ERROR_OTHER, nullptr);
             return false;
         }
     }
@@ -541,7 +541,7 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown) {
     if (!long_options) {
         for (int i = 0; i < argc; i++) free(argv_copy[i]);
         free(argv_copy);
-        set_error(c, CLI_PARSE_ERROR_MEMORY, nullptr);
+        set_error(c, CLI_PARSE_ERROR_OTHER, nullptr);
         return false;
     }
 
@@ -562,7 +562,7 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown) {
             if (fail_on_unknown) {
                 const char * bad_tok = (optind > 1 && optind <= argc) ? argv_copy[optind - 1] : nullptr;
                 char fallback[2] = {(char)optopt, '\0'};
-                set_error(c, CLI_PARSE_ERROR_UNKNOWN, (bad_tok && bad_tok[0] == '-') ? bad_tok : (optopt ? fallback : nullptr));
+                set_error(c, CLI_PARSE_ERROR_UNKNOWN_OPTION, (bad_tok && bad_tok[0] == '-') ? bad_tok : (optopt ? fallback : nullptr));
                 success = false;
                 break;
             }
@@ -626,7 +626,7 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown) {
 cli_error_code cli_get_error(cli c, char ** option) {
     if (!c) {
         if (option) *option = nullptr;
-        return CLI_PARSE_ERROR_MEMORY;
+        return CLI_PARSE_ERROR_OTHER;
     }
     if (option) {
         *option = c->error_option[0] != '\0' ? c->error_option : nullptr;

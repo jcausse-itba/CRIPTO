@@ -35,12 +35,12 @@ typedef enum {
  */
 typedef enum {
     CLI_PARSE_ERROR_NONE = 0,           // No error occurred.
-    CLI_PARSE_ERROR_UNKNOWN,            // An unregistered option was encountered (when fail_on_unknown is true).
+    CLI_PARSE_ERROR_UNKNOWN_OPTION,     // An unregistered option was encountered (when fail_on_unknown is true).
     CLI_PARSE_ERROR_MISSING_REQUIRED,   // A required option was not provided.
     CLI_PARSE_ERROR_MISSING_VALUE,      // An option requiring a value was passed without an argument.
     CLI_PARSE_ERROR_NOT_A_CHOICE,       // A CLI_TYPE_CHOICE option received a value not in its allowed choices.
     CLI_PARSE_ERROR_INVALID_VALUE,      // An option's value failed type or format validation (integer, float, path).
-    CLI_PARSE_ERROR_MEMORY              // Memory allocation failure or invalid parser state.
+    CLI_PARSE_ERROR_OTHER               // Memory allocation failure or invalid parser state.
 } cli_error_code;
 
 /**

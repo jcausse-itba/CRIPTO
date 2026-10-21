@@ -339,7 +339,7 @@ static void test_error_reporting() {
     // 1. Unknown option when fail_on_unknown is true
     const char *argv_unknown[] = {"program", "--bogus", "-in", "file.txt"};
     ASSERT_MSG(!cli_parse(c, 4, argv_unknown, true), "Should fail on unknown option when fail_on_unknown is true");
-    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_UNKNOWN, "Expected CLI_PARSE_ERROR_UNKNOWN");
+    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_UNKNOWN_OPTION, "Expected CLI_PARSE_ERROR_UNKNOWN_OPTION");
     ASSERT_MSG(err_opt != nullptr && strcmp(err_opt, "bogus") == 0, "Expected offending option 'bogus'");
 
     // 2. Missing value for an option requiring an argument
