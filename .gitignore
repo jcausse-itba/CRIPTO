@@ -97,7 +97,8 @@ $RECYCLE.BIN/
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,windows,linux,macos
 
 # CLion
-.idea/
+.idea/*
+!.idea/runConfigurations
 cmake-build-*/
 
 # Build artifacts
