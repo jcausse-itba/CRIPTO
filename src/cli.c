@@ -239,7 +239,7 @@ static cli_option_internal * lookup_option(cli c, const char * name) {
 }
 
 /**
- * @brief Build the getopt_long option tables from registered options.
+ * @brief Build the getopt_long_only option tables from registered options.
  *
  * @param c              The CLI parser.
  * @param long_options   Output: caller-allocated array of size (option_count + 1).
@@ -342,7 +342,7 @@ bool cli_add_option(cli c, cli_option o) {
 bool cli_parse(cli c, int argc, const char *argv[]) {
     if (!c || !argv || argc < 1) return false;
 
-    // getopt_long may permute argv, so work on a mutable copy
+    // getopt_long_only may permute argv, so work on a mutable copy
     char **argv_copy = malloc(argc * sizeof(char *));
     if (!argv_copy) return false;
     for (int i = 0; i < argc; i++) {
@@ -373,7 +373,7 @@ bool cli_parse(cli c, int argc, const char *argv[]) {
     int opt_val;
     int option_index = 0;
 
-    while ((opt_val = getopt_long(argc, argv_copy, short_options, long_options, &option_index)) != -1) {
+    while ((opt_val = getopt_long_only(argc, argv_copy, short_options, long_options, &option_index)) != -1) {
         if (opt_val == '?') continue;   // Unknown option — ignore
         if (opt_val == ':') {           // Missing required argument
             success = false;

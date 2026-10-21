@@ -152,7 +152,8 @@ static void test_flag_options() {
     };
     ASSERT_MSG(cli_add_option(c, opt_extract), "Failed to add extract flag option");
 
-    const char *argv[] = {"program", "-e"};
+    // Test single-dash long flag (-embed) via getopt_long_only
+    const char *argv[] = {"program", "-embed"};
     int argc = 2;
 
     ASSERT_MSG(cli_parse(c, argc, argv), "Failed to parse flag arguments");
@@ -192,7 +193,7 @@ static void test_choice_options() {
     };
     ASSERT_MSG(cli_add_option(c, opt_mode), "Failed to add mode choice option");
 
-    const char *argv[] = {"program", "--steg", "LSBI"};
+    const char *argv[] = {"program", "-steg", "LSBI"};
     int argc = 3;
 
     ASSERT_MSG(cli_parse(c, argc, argv), "Failed to parse valid choice argument");
