@@ -2,6 +2,7 @@
 #include "hashmap.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <getopt.h>
 #include <regex.h>
 #include <errno.h>
@@ -23,6 +24,7 @@ struct cli_internal {
     bool is_parsed;
     cli_error_code error_code;
     char error_option[CLI_MAX_LONG_OPTION_NAME];
+    char * usage_str;
     HashMap map;
 };
 
@@ -360,6 +362,72 @@ static void build_getopt_tables(cli c, struct option * long_options, char * shor
     // Sentinel entry for long_options (already zeroed by calloc)
 }
 
+/**
+ * @brief Format the usage text into buf (or compute the required length if buf is NULL).
+ * @return Total number of characters excluding the null terminator.
+ */
+static size_t format_usage(cli c, const char * prog_name, char * buf, size_t buf_size) {
+    size_t pos = 0;
+    const char * prog = (prog_name && prog_name[0] != '\0') ? prog_name : "program";
+
+    #define APPEND_FMT(...) \
+        do { \
+            int _n = snprintf(buf ? buf + pos : nullptr, (buf && pos < buf_size) ? buf_size - pos : 0, __VA_ARGS__); \
+            if (_n > 0) pos += (size_t)_n; \
+        } while (0)
+
+    APPEND_FMT("Usage: %s", prog);
+
+    for (size_t i = 0; i < c->option_count; i++) {
+        const cli_option * def = &c->options[i].def;
+        const bool has_short = def->option_name_short[0] != '\0';
+        const bool has_long  = def->option_name_long[0] != '\0';
+
+        APPEND_FMT(" %s", def->required ? "" : "[");
+        if (has_short && has_long) {
+            APPEND_FMT("-%s|--%s", def->option_name_short, def->option_name_long);
+        } 
+        else if (has_short) {
+            APPEND_FMT("-%s", def->option_name_short);
+        } 
+        else {
+            APPEND_FMT("--%s", def->option_name_long);
+        }
+
+        switch (def->type) {
+            case CLI_TYPE_INTEGER:
+                APPEND_FMT(" <int>");
+                break;
+            case CLI_TYPE_FLOAT:
+                APPEND_FMT(" <float>");
+                break;
+            case CLI_TYPE_STRING:
+                APPEND_FMT(" <string>");
+                break;
+            case CLI_TYPE_PATH:
+                APPEND_FMT(" <path>");
+                break;
+            case CLI_TYPE_FLAG:
+                break;
+            case CLI_TYPE_CHOICE:
+                APPEND_FMT(" <");
+                if (def->choices) {
+                    for (size_t j = 0; def->choices[j] != nullptr; j++) {
+                        APPEND_FMT("%s%s", j > 0 ? "|" : "", def->choices[j]);
+                    }
+                }
+                APPEND_FMT(">");
+                break;
+        }
+        APPEND_FMT("%s", def->required ? "" : "]");
+    }
+
+    APPEND_FMT("\n");
+
+    #undef APPEND_FMT
+    return pos;
+}
+
 /*************************************************************************/
 /*                          Public API                                   */
 /*************************************************************************/
@@ -384,6 +452,10 @@ void cli_destroy(cli c) {
         if (opt->owns_string && opt->parsed_value.string_value) {
             free(opt->parsed_value.string_value);
         }
+    }
+
+    if (c->usage_str) {
+        free(c->usage_str);
     }
 
     if (c->map) {
@@ -560,6 +632,22 @@ cli_error_code cli_get_error(cli c, char ** option) {
         *option = c->error_option[0] != '\0' ? c->error_option : nullptr;
     }
     return c->error_code;
+}
+
+const char * cli_usage(cli c, const char * prog_name) {
+    if (!c) return nullptr;
+
+    if (c->usage_str) {
+        free(c->usage_str);
+        c->usage_str = nullptr;
+    }
+
+    const size_t len = format_usage(c, prog_name, nullptr, 0);
+    c->usage_str = malloc(len + 1);
+    if (!c->usage_str) return nullptr;
+
+    format_usage(c, prog_name, c->usage_str, len + 1);
+    return c->usage_str;
 }
 
 bool cli_is_set(cli c, const char * name, bool * out_is_set) {

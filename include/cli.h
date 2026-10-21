@@ -111,6 +111,17 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown);
 cli_error_code cli_get_error(cli c, char **option);
 
 /**
+ * @brief Generates and returns a usage string based on the registered options.
+ * 
+ * The string is allocated on demand when called and owned by the CLI parser (freed by cli_destroy).
+ * 
+ * @param c The CLI parser.
+ * @param prog_name The program name to display in the usage synopsis (defaults to "program" if NULL or empty).
+ * @return Pointer to the generated usage string, or NULL on failure.
+ */
+const char *cli_usage(cli c, const char *prog_name);
+
+/**
  * @brief Checks whether a given option was explicitly provided on the command line.
  * 
  * @param c The CLI parser.

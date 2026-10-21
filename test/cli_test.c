@@ -351,6 +351,44 @@ static void test_error_reporting() {
     cli_destroy(c);
 }
 
+static void test_usage_generation() {
+    cli c = cli_create();
+
+    cli_option opt_embed = {
+        .option_name_short = "e",
+        .option_name_long = "embed",
+        .type = CLI_TYPE_FLAG,
+        .required = false
+    };
+    ASSERT(cli_add_option(c, opt_embed));
+
+    cli_option opt_in = {
+        .option_name_long = "in",
+        .type = CLI_TYPE_PATH,
+        .required = true
+    };
+    ASSERT(cli_add_option(c, opt_in));
+
+    const char *steg_choices[] = {"LSB1", "LSB4", "LSBI", nullptr};
+    cli_option opt_steg = {
+        .option_name_short = "s",
+        .option_name_long = "steg",
+        .type = CLI_TYPE_CHOICE,
+        .required = true,
+        .choices = steg_choices
+    };
+    ASSERT(cli_add_option(c, opt_steg));
+
+    const char *usage = cli_usage(c, "stegobmp");
+    ASSERT_MSG(usage != nullptr, "cli_usage should return a non-NULL string");
+    ASSERT_MSG(
+        strcmp(usage, "Usage: stegobmp [-e|--embed] --in <path> -s|--steg <LSB1|LSB4|LSBI>\n") == 0,
+        "Generated usage string did not match expected format"
+    );
+
+    cli_destroy(c);
+}
+
 int main() {
     test_basic_parsing();
     test_missing_required();
@@ -362,6 +400,7 @@ int main() {
     test_invalid_choice();
     test_duplicate_and_invalid_option_names();
     test_error_reporting();
+    test_usage_generation();
     
     return ASSERT_REPORT();
 }
