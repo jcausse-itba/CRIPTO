@@ -2,12 +2,12 @@
 #include "hashmap.h"
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <getopt.h>
 #include <regex.h>
 #include <errno.h>
 
 #define MAX_OPTIONS 128
+#define USAGE_CHUNK_SIZE 50
 
 #define PATH_REGEX "^[a-zA-Z0-9_./\\\\-]+$"
 
@@ -22,6 +22,8 @@ struct cli_internal {
     cli_option_internal options[MAX_OPTIONS];
     size_t option_count;
     bool is_parsed;
+    bool path_regex_compiled;
+    regex_t path_regex;
     cli_error_code error_code;
     char error_option[CLI_MAX_LONG_OPTION_NAME];
     char * usage_str;
@@ -43,6 +45,7 @@ static uint32_t string_hash_fn(HashMapKey key, size_t hash_table_size) {
 }
 
 static bool string_equals_fn(HashMapKey key1, HashMapKey key2) {
+    if (key1 == key2) return true;
     if (!key1 || !key2) return false;
     return strncmp(key1, key2, CLI_MAX_LONG_OPTION_NAME) == 0;
 }
@@ -65,14 +68,10 @@ static size_t strip_leading_dashes(char *buf, size_t buf_size) {
         start++;
     }
 
-    if (start == 0) {
-        return strlen(buf);
-    }
-
-    // buf[start] is either '\0' (all-dashes) or the first real char.
-    // In either case memmove produces a valid C string.
     const size_t remaining = strlen(buf + start);
-    memmove(buf, buf + start, remaining + 1);
+    if (start > 0) {
+        memmove(buf, buf + start, remaining + 1);
+    }
     return remaining;
 }
 
@@ -137,15 +136,15 @@ static bool parse_float(const char * str, double * out) {
 }
 
 /**
- * @brief Validate a path string against the path regex.
+ * @brief Validate a path string against the cached path regex (compiled lazily once per CLI instance).
  * @return true if the path matches, false otherwise.
  */
-static bool validate_path(const char * str) {
-    regex_t regex;
-    if (regcomp(&regex, PATH_REGEX, REG_EXTENDED | REG_NOSUB) != 0) return false;
-    bool ok = regexec(&regex, str, 0, nullptr, 0) == 0;
-    regfree(&regex);
-    return ok;
+static bool validate_path(cli c, const char * str) {
+    if (!c->path_regex_compiled) {
+        if (regcomp(&c->path_regex, PATH_REGEX, REG_EXTENDED | REG_NOSUB) != 0) return false;
+        c->path_regex_compiled = true;
+    }
+    return regexec(&c->path_regex, str, 0, nullptr, 0) == 0;
 }
 
 /**
@@ -245,7 +244,7 @@ static bool assign_optarg(cli c, cli_option_internal * opt, const char * arg) {
             return true;
         }
         case CLI_TYPE_PATH: {
-            if (!validate_path(arg)) {
+            if (!validate_path(c, arg)) {
                 set_error(c, CLI_PARSE_ERROR_INVALID_VALUE, name);
                 return false;
             }
@@ -327,26 +326,32 @@ static bool has_value(cli c, const cli_option_internal * opt) {
  * @brief Build the getopt_long_only option tables from registered options.
  *
  * @param c              The CLI parser.
- * @param long_options   Output: caller-allocated array of size (option_count + 1).
+ * @param long_options   Output: caller-allocated array of size (MAX_OPTIONS + 1).
+ * @param long_opt_map   Output: maps long_options index directly to cli_option_internal pointer.
  * @param short_options  Output: caller-allocated buffer of size (MAX_OPTIONS * 3 + 2).
  */
-static void build_getopt_tables(cli c, struct option * long_options, char * short_options) {
+static void build_getopt_tables(
+    cli c,
+    struct option * long_options,
+    cli_option_internal ** long_opt_map,
+    char * short_options
+) {
     int long_idx = 0;
     int short_idx = 0;
 
     short_options[short_idx++] = ':'; // return ':' for missing arguments
 
     for (size_t i = 0; i < c->option_count; i++) {
-        const cli_option * def = &(c->options[i].def);
+        cli_option_internal * opt = &c->options[i];
+        const cli_option * def = &opt->def;
         const bool is_flag = (def->type == CLI_TYPE_FLAG);
 
         if (def->option_name_long[0] != '\0') {
             long_options[long_idx].name     = def->option_name_long;
             long_options[long_idx].has_arg  = is_flag ? no_argument : required_argument;
             long_options[long_idx].flag     = nullptr;
-            long_options[long_idx].val      = def->option_name_short[0] != '\0'
-                                              ? (unsigned char)def->option_name_short[0]
-                                              : 0;
+            long_options[long_idx].val      = 0;
+            long_opt_map[long_idx]          = opt;
             long_idx++;
         }
 
@@ -358,74 +363,110 @@ static void build_getopt_tables(cli c, struct option * long_options, char * shor
         }
     }
 
+    // Zero only the sentinel entry instead of calloc-ing the entire table
+    long_options[long_idx] = (struct option){0};
     short_options[short_idx] = '\0';
-    // Sentinel entry for long_options (already zeroed by calloc)
 }
 
 /**
- * @brief Format the usage text into buf (or compute the required length if buf is NULL).
- * @return Total number of characters excluding the null terminator.
+ * @brief Append a string slice to a dynamically grown buffer in USAGE_CHUNK_SIZE increments.
+ * @return true on success, false on reallocation failure.
  */
-static size_t format_usage(cli c, const char * prog_name, char * buf, size_t buf_size) {
-    size_t pos = 0;
-    const char * prog = (prog_name && prog_name[0] != '\0') ? prog_name : "program";
+static bool usage_append(char ** buf, size_t * len, size_t * cap, const char * str) {
+    const size_t add_len = strlen(str);
+    if (*len + add_len + 1 > *cap) {
+        size_t new_cap = *cap;
+        while (*len + add_len + 1 > new_cap) {
+            new_cap += USAGE_CHUNK_SIZE;
+        }
+        char * new_buf = realloc(*buf, new_cap);
+        if (!new_buf) return false;
+        *buf = new_buf;
+        *cap = new_cap;
+    }
+    memcpy(*buf + *len, str, add_len);
+    *len += add_len;
+    (*buf)[*len] = '\0';
+    return true;
+}
 
-    #define APPEND_FMT(...) \
+/**
+ * @brief Build the usage string in a single pass using chunked reallocations.
+ * @return Newly allocated usage string, or NULL on allocation failure.
+ */
+static char * build_usage_string(cli c, const char * prog_name) {
+    const char * prog = (prog_name && prog_name[0] != '\0') ? prog_name : "program";
+    char * buf = nullptr;
+    size_t len = 0;
+    size_t cap = 0;
+
+    #define APPEND_STR(s) \
         do { \
-            int _n = snprintf(buf ? buf + pos : nullptr, (buf && pos < buf_size) ? buf_size - pos : 0, __VA_ARGS__); \
-            if (_n > 0) pos += (size_t)_n; \
+            if (!usage_append(&buf, &len, &cap, (s))) { \
+                free(buf); \
+                return nullptr; \
+            } \
         } while (0)
 
-    APPEND_FMT("Usage: %s", prog);
+    APPEND_STR("Usage: ");
+    APPEND_STR(prog);
 
     for (size_t i = 0; i < c->option_count; i++) {
         const cli_option * def = &c->options[i].def;
         const bool has_short = def->option_name_short[0] != '\0';
         const bool has_long  = def->option_name_long[0] != '\0';
 
-        APPEND_FMT(" %s", def->required ? "" : "[");
+        APPEND_STR(def->required ? " " : " [");
         if (has_short && has_long) {
-            APPEND_FMT("-%s|--%s", def->option_name_short, def->option_name_long);
+            APPEND_STR("-");
+            APPEND_STR(def->option_name_short);
+            APPEND_STR("|--");
+            APPEND_STR(def->option_name_long);
         } 
         else if (has_short) {
-            APPEND_FMT("-%s", def->option_name_short);
+            APPEND_STR("-");
+            APPEND_STR(def->option_name_short);
         } 
         else {
-            APPEND_FMT("--%s", def->option_name_long);
+            APPEND_STR("--");
+            APPEND_STR(def->option_name_long);
         }
 
         switch (def->type) {
             case CLI_TYPE_INTEGER:
-                APPEND_FMT(" <int>");
+                APPEND_STR(" <int>");
                 break;
             case CLI_TYPE_FLOAT:
-                APPEND_FMT(" <float>");
+                APPEND_STR(" <float>");
                 break;
             case CLI_TYPE_STRING:
-                APPEND_FMT(" <string>");
+                APPEND_STR(" <string>");
                 break;
             case CLI_TYPE_PATH:
-                APPEND_FMT(" <path>");
+                APPEND_STR(" <path>");
                 break;
             case CLI_TYPE_FLAG:
                 break;
             case CLI_TYPE_CHOICE:
-                APPEND_FMT(" <");
+                APPEND_STR(" <");
                 if (def->choices) {
                     for (size_t j = 0; def->choices[j] != nullptr; j++) {
-                        APPEND_FMT("%s%s", j > 0 ? "|" : "", def->choices[j]);
+                        if (j > 0) APPEND_STR("|");
+                        APPEND_STR(def->choices[j]);
                     }
                 }
-                APPEND_FMT(">");
+                APPEND_STR(">");
                 break;
         }
-        APPEND_FMT("%s", def->required ? "" : "]");
+        if (!def->required) {
+            APPEND_STR("]");
+        }
     }
 
-    APPEND_FMT("\n");
+    APPEND_STR("\n");
 
-    #undef APPEND_FMT
-    return pos;
+    #undef APPEND_STR
+    return buf;
 }
 
 /*************************************************************************/
@@ -454,6 +495,10 @@ void cli_destroy(cli c) {
         }
     }
 
+    if (c->path_regex_compiled) {
+        regfree(&c->path_regex);
+    }
+
     if (c->usage_str) {
         free(c->usage_str);
     }
@@ -477,17 +522,15 @@ bool cli_add_option(cli c, cli_option o) {
     // Short option name must be at most 1 character, and at least one name must be non-empty
     if (short_len > 1 || (short_len == 0 && long_len == 0)) return false;
 
-    // Reject duplicate option names (including short/long collision within the same option)
+    // Reject short/long collision within the same option
     if (short_len > 0 && long_len > 0 && strcmp(o.option_name_short, o.option_name_long) == 0) return false;
-    if (short_len > 0 && HashMap_contains(c->map, o.option_name_short)) return false;
-    if (long_len > 0 && HashMap_contains(c->map, o.option_name_long)) return false;
 
     cli_option_internal * opt = &c->options[c->option_count];
     opt->def = o;
     opt->is_set = false;
     opt->owns_string = false;
 
-    // Register both name forms in the hashmap
+    // Register both name forms in the hashmap (HashMap_put rejects duplicates in a single traversal)
     if (short_len > 0) {
         if (HashMap_put(c->map, (HashMapKey) opt->def.option_name_short, (HashMapValue) opt) != HASHMAP_OK) {
             return false;
@@ -521,32 +564,18 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown) {
         c->options[i].is_set = false;
     }
 
-    // getopt_long_only may permute argv, so work on a mutable copy
-    char **argv_copy = malloc(argc * sizeof(char *));
+    // getopt_long_only only permutes the argv pointer array, not the strings themselves
+    char **argv_copy = malloc((size_t)argc * sizeof(char *));
     if (!argv_copy) {
         set_error(c, CLI_PARSE_ERROR_OTHER, nullptr);
         return false;
     }
-    for (int i = 0; i < argc; i++) {
-        argv_copy[i] = strdup(argv[i]);
-        if (!argv_copy[i]) {
-            for (int j = 0; j < i; j++) free(argv_copy[j]);
-            free(argv_copy);
-            set_error(c, CLI_PARSE_ERROR_OTHER, nullptr);
-            return false;
-        }
-    }
+    memcpy(argv_copy, argv, (size_t)argc * sizeof(char *));
 
-    struct option * long_options = calloc(c->option_count + 1, sizeof(struct option));
-    if (!long_options) {
-        for (int i = 0; i < argc; i++) free(argv_copy[i]);
-        free(argv_copy);
-        set_error(c, CLI_PARSE_ERROR_OTHER, nullptr);
-        return false;
-    }
-
+    struct option long_options[MAX_OPTIONS + 1];
+    cli_option_internal * long_opt_map[MAX_OPTIONS];
     char short_options[MAX_OPTIONS * 3 + 2];
-    build_getopt_tables(c, long_options, short_options);
+    build_getopt_tables(c, long_options, long_opt_map, short_options);
 
     // Save and configure getopt state
     int old_opterr = opterr;
@@ -583,11 +612,10 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown) {
             break;
         }
 
-        // Resolve the matched option via the hashmap
+        // Resolve the matched option: O(1) direct array access for long options, HashMap for short options
         cli_option_internal * found = nullptr;
         if (opt_val == 0) {
-            // Long-only option (no short alias): use name from long_options table
-            found = lookup_option(c, long_options[option_index].name);
+            found = long_opt_map[option_index];
         } 
         else {
             char short_name[2] = {(char)opt_val, '\0'};
@@ -616,8 +644,6 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown) {
 
     c->is_parsed = true;
 
-    free(long_options);
-    for (int i = 0; i < argc; i++) free(argv_copy[i]);
     free(argv_copy);
 
     return success;
@@ -639,14 +665,9 @@ const char * cli_usage(cli c, const char * prog_name) {
 
     if (c->usage_str) {
         free(c->usage_str);
-        c->usage_str = nullptr;
     }
 
-    const size_t len = format_usage(c, prog_name, nullptr, 0);
-    c->usage_str = malloc(len + 1);
-    if (!c->usage_str) return nullptr;
-
-    format_usage(c, prog_name, c->usage_str, len + 1);
+    c->usage_str = build_usage_string(c, prog_name);
     return c->usage_str;
 }
 
