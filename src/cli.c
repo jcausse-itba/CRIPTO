@@ -21,6 +21,8 @@ struct cli_internal {
     cli_option_internal options[MAX_OPTIONS];
     size_t option_count;
     bool is_parsed;
+    cli_error_code error_code;
+    char error_option[CLI_MAX_LONG_OPTION_NAME];
     HashMap map;
 };
 
@@ -70,6 +72,38 @@ static size_t strip_leading_dashes(char *buf, size_t buf_size) {
     const size_t remaining = strlen(buf + start);
     memmove(buf, buf + start, remaining + 1);
     return remaining;
+}
+
+/**
+ * @brief Return the canonical name of an option (prefers long name, falls back to short name).
+ */
+static const char * get_option_name(const cli_option_internal * opt) {
+    if (opt->def.option_name_long[0] != '\0') {
+        return opt->def.option_name_long;
+    }
+    return opt->def.option_name_short;
+}
+
+/**
+ * @brief Record the first parse error and the offending option name.
+ */
+static void set_error(cli c, cli_error_code code, const char * option_name) {
+    if (!c || c->error_code != CLI_PARSE_ERROR_NONE) return;
+    c->error_code = code;
+    if (option_name) {
+        while (*option_name == '-') {
+            option_name++;
+        }
+        size_t len = 0;
+        while (option_name[len] != '\0' && option_name[len] != '=' && len < CLI_MAX_LONG_OPTION_NAME - 1) {
+            c->error_option[len] = option_name[len];
+            len++;
+        }
+        c->error_option[len] = '\0';
+    } 
+    else {
+        c->error_option[0] = '\0';
+    }
 }
 
 /**
@@ -179,29 +213,59 @@ static bool set_bool_value(cli_option_internal * opt, bool val) {
  * @brief Parse and assign optarg to the matched option according to its type.
  * @return true on success, false on type mismatch or validation error.
  */
-static bool assign_optarg(cli_option_internal * opt, const char * arg) {
-    if (opt->def.type != CLI_TYPE_FLAG && !arg) return false;
+static bool assign_optarg(cli c, cli_option_internal * opt, const char * arg) {
+    const char * name = get_option_name(opt);
+    if (opt->def.type != CLI_TYPE_FLAG && !arg) {
+        set_error(c, CLI_PARSE_ERROR_MISSING_VALUE, name);
+        return false;
+    }
 
     switch (opt->def.type) {
         case CLI_TYPE_INTEGER: {
-            return set_long_value(opt, arg);
+            if (!set_long_value(opt, arg)) {
+                set_error(c, CLI_PARSE_ERROR_INVALID_VALUE, name);
+                return false;
+            }
+            return true;
         }
         case CLI_TYPE_FLOAT: {
-            return set_double_value(opt, arg);
+            if (!set_double_value(opt, arg)) {
+                set_error(c, CLI_PARSE_ERROR_INVALID_VALUE, name);
+                return false;
+            }
+            return true;
         }
         case CLI_TYPE_STRING: {
-            return set_string_value(opt, arg, true);
+            if (!set_string_value(opt, arg, true)) {
+                set_error(c, CLI_PARSE_ERROR_MEMORY, name);
+                return false;
+            }
+            return true;
         }
         case CLI_TYPE_PATH: {
-            if (!validate_path(arg)) return false;
-            return set_string_value(opt, arg, true);
+            if (!validate_path(arg)) {
+                set_error(c, CLI_PARSE_ERROR_INVALID_VALUE, name);
+                return false;
+            }
+            if (!set_string_value(opt, arg, true)) {
+                set_error(c, CLI_PARSE_ERROR_MEMORY, name);
+                return false;
+            }
+            return true;
         }
         case CLI_TYPE_FLAG: {
             return set_bool_value(opt, true);
         }
         case CLI_TYPE_CHOICE: {
-            if (!validate_choice(arg, opt->def.choices)) return false;
-            return set_string_value(opt, arg, true);
+            if (!validate_choice(arg, opt->def.choices)) {
+                set_error(c, CLI_PARSE_ERROR_NOT_A_CHOICE, name);
+                return false;
+            }
+            if (!set_string_value(opt, arg, true)) {
+                set_error(c, CLI_PARSE_ERROR_MEMORY, name);
+                return false;
+            }
+            return true;
         }
     }
     return false;
@@ -370,8 +434,16 @@ bool cli_add_option(cli c, cli_option o) {
     return true;
 }
 
-bool cli_parse(cli c, int argc, const char *argv[]) {
-    if (!c || !argv || argc < 1) return false;
+bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown) {
+    if (!c) return false;
+
+    c->error_code = CLI_PARSE_ERROR_NONE;
+    c->error_option[0] = '\0';
+
+    if (!argv || argc < 1) {
+        set_error(c, CLI_PARSE_ERROR_MEMORY, nullptr);
+        return false;
+    }
 
     for (size_t i = 0; i < c->option_count; i++) {
         c->options[i].is_set = false;
@@ -379,12 +451,16 @@ bool cli_parse(cli c, int argc, const char *argv[]) {
 
     // getopt_long_only may permute argv, so work on a mutable copy
     char **argv_copy = malloc(argc * sizeof(char *));
-    if (!argv_copy) return false;
+    if (!argv_copy) {
+        set_error(c, CLI_PARSE_ERROR_MEMORY, nullptr);
+        return false;
+    }
     for (int i = 0; i < argc; i++) {
         argv_copy[i] = strdup(argv[i]);
         if (!argv_copy[i]) {
             for (int j = 0; j < i; j++) free(argv_copy[j]);
             free(argv_copy);
+            set_error(c, CLI_PARSE_ERROR_MEMORY, nullptr);
             return false;
         }
     }
@@ -393,6 +469,7 @@ bool cli_parse(cli c, int argc, const char *argv[]) {
     if (!long_options) {
         for (int i = 0; i < argc; i++) free(argv_copy[i]);
         free(argv_copy);
+        set_error(c, CLI_PARSE_ERROR_MEMORY, nullptr);
         return false;
     }
 
@@ -409,8 +486,27 @@ bool cli_parse(cli c, int argc, const char *argv[]) {
     int option_index = 0;
 
     while ((opt_val = getopt_long_only(argc, argv_copy, short_options, long_options, &option_index)) != -1) {
-        if (opt_val == '?') continue;   // Unknown option — ignore
+        if (opt_val == '?') {
+            if (fail_on_unknown) {
+                const char * bad_tok = (optind > 1 && optind <= argc) ? argv_copy[optind - 1] : nullptr;
+                char fallback[2] = {(char)optopt, '\0'};
+                set_error(c, CLI_PARSE_ERROR_UNKNOWN, (bad_tok && bad_tok[0] == '-') ? bad_tok : (optopt ? fallback : nullptr));
+                success = false;
+                break;
+            }
+            continue;   // Ignore unknown option
+        }
         if (opt_val == ':') {           // Missing required argument
+            cli_option_internal * missing_opt = nullptr;
+            if (optopt != 0) {
+                char short_name[2] = {(char)optopt, '\0'};
+                missing_opt = lookup_option(c, short_name);
+            }
+            if (!missing_opt && optind > 1 && optind <= argc) {
+                missing_opt = lookup_option(c, argv_copy[optind - 1]);
+            }
+            const char * tok = (optind > 1 && optind <= argc) ? argv_copy[optind - 1] : nullptr;
+            set_error(c, CLI_PARSE_ERROR_MISSING_VALUE, missing_opt ? get_option_name(missing_opt) : tok);
             success = false;
             break;
         }
@@ -426,7 +522,7 @@ bool cli_parse(cli c, int argc, const char *argv[]) {
             found = lookup_option(c, short_name);
         }
 
-        if (found && !assign_optarg(found, optarg)) {
+        if (found && !assign_optarg(c, found, optarg)) {
             success = false;
         }
     }
@@ -437,6 +533,7 @@ bool cli_parse(cli c, int argc, const char *argv[]) {
     for (size_t i = 0; i < c->option_count; i++) {
         if (!c->options[i].is_set) {
             if (c->options[i].def.required) {
+                set_error(c, CLI_PARSE_ERROR_MISSING_REQUIRED, get_option_name(&c->options[i]));
                 success = false;
             } 
             else {
@@ -452,6 +549,17 @@ bool cli_parse(cli c, int argc, const char *argv[]) {
     free(argv_copy);
 
     return success;
+}
+
+cli_error_code cli_get_error(cli c, char ** option) {
+    if (!c) {
+        if (option) *option = nullptr;
+        return CLI_PARSE_ERROR_MEMORY;
+    }
+    if (option) {
+        *option = c->error_option[0] != '\0' ? c->error_option : nullptr;
+    }
+    return c->error_code;
 }
 
 bool cli_is_set(cli c, const char * name, bool * out_is_set) {

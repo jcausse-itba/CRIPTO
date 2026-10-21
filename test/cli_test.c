@@ -26,7 +26,11 @@ static void test_basic_parsing() {
     const char *argv[] = {"program", "-i", "42", "--unknown", "ignore_me"};
     int argc = 5;
 
-    ASSERT_MSG(cli_parse(c, argc, argv), "Failed to parse valid basic arguments");
+    ASSERT_MSG(cli_parse(c, argc, argv, false), "Failed to parse valid basic arguments");
+
+    char *err_opt = nullptr;
+    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_NONE, "Error code should be NONE");
+    ASSERT_MSG(err_opt == nullptr, "Error option should be NULL on success");
 
     long val_int = 0;
     ASSERT_MSG(cli_get_integer(c, "i", &val_int), "Failed to retrieve integer 'i'");
@@ -66,7 +70,12 @@ static void test_missing_required() {
     const char *argv[] = {"program"};
     int argc = 1;
 
-    ASSERT_MSG(!cli_parse(c, argc, argv), "Parsing should fail when a required option is missing"); 
+    ASSERT_MSG(!cli_parse(c, argc, argv, false), "Parsing should fail when a required option is missing");
+
+    char *err_opt = nullptr;
+    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_MISSING_REQUIRED, "Expected MISSING_REQUIRED error code");
+    ASSERT_MSG(err_opt != nullptr && strcmp(err_opt, "integer") == 0, "Expected offending option to be 'integer'");
+
     cli_destroy(c);
 }
 
@@ -92,7 +101,7 @@ static void test_float_and_path() {
     const char *argv[] = {"program", "-f", "3.14", "--path", "/valid/path.txt"};
     int argc = 5;
 
-    ASSERT_MSG(cli_parse(c, argc, argv), "Failed to parse float and path arguments");
+    ASSERT_MSG(cli_parse(c, argc, argv, true), "Failed to parse float and path arguments");
 
     double val_f = 0.0;
     ASSERT(cli_get_float(c, "float", &val_f));
@@ -116,14 +125,20 @@ static void test_invalid_types() {
     };
     ASSERT(cli_add_option(c, opt_int));
 
+    char *err_opt = nullptr;
+
     const char *argv_str[] = {"program", "-i", "not_an_integer"};
-    ASSERT_MSG(!cli_parse(c, 3, argv_str), "Parsing should fail when passing string to integer option");
+    ASSERT_MSG(!cli_parse(c, 3, argv_str, false), "Parsing should fail when passing string to integer option");
+    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_INVALID_VALUE, "Expected INVALID_VALUE error code");
+    ASSERT_MSG(err_opt != nullptr && strcmp(err_opt, "integer") == 0, "Expected offending option 'integer'");
 
     const char *argv_empty[] = {"program", "-i", ""};
-    ASSERT_MSG(!cli_parse(c, 3, argv_empty), "Parsing should fail when passing empty string to integer option");
+    ASSERT_MSG(!cli_parse(c, 3, argv_empty, false), "Parsing should fail when passing empty string to integer option");
+    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_INVALID_VALUE, "Expected INVALID_VALUE error code on empty string");
 
     const char *argv_overflow[] = {"program", "-i", "9999999999999999999999999999999999999999"};
-    ASSERT_MSG(!cli_parse(c, 3, argv_overflow), "Parsing should fail on integer overflow");
+    ASSERT_MSG(!cli_parse(c, 3, argv_overflow, false), "Parsing should fail on integer overflow");
+    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_INVALID_VALUE, "Expected INVALID_VALUE error code on overflow");
 
     cli_destroy(c);
 }
@@ -142,7 +157,7 @@ static void test_default_values() {
     const char *argv[] = {"program"};
     int argc = 1;
 
-    ASSERT_MSG(cli_parse(c, argc, argv), "Failed to parse with 0 arguments (using defaults)");
+    ASSERT_MSG(cli_parse(c, argc, argv, true), "Failed to parse with 0 arguments (using defaults)");
 
     long val_int = 0;
     ASSERT(cli_get_integer(c, "i", &val_int));
@@ -177,7 +192,7 @@ static void test_flag_options() {
     const char *argv[] = {"program", "-embed"};
     int argc = 2;
 
-    ASSERT_MSG(cli_parse(c, argc, argv), "Failed to parse flag arguments");
+    ASSERT_MSG(cli_parse(c, argc, argv, true), "Failed to parse flag arguments");
 
     bool embed_val = false;
     ASSERT_MSG(cli_get_flag(c, "embed", &embed_val), "Failed to retrieve flag 'embed'");
@@ -217,7 +232,7 @@ static void test_choice_options() {
     const char *argv[] = {"program", "-steg", "LSBI"};
     int argc = 3;
 
-    ASSERT_MSG(cli_parse(c, argc, argv), "Failed to parse valid choice argument");
+    ASSERT_MSG(cli_parse(c, argc, argv, true), "Failed to parse valid choice argument");
 
     const char *val_steg = nullptr;
     ASSERT_MSG(cli_get_string(c, "steg", &val_steg), "Failed to retrieve choice 'steg' via cli_get_string");
@@ -267,7 +282,11 @@ static void test_invalid_choice() {
     const char *argv[] = {"program", "-a", "des"};
     int argc = 3;
 
-    ASSERT_MSG(!cli_parse(c, argc, argv), "Parsing should fail when choice is not in allowed choices");
+    ASSERT_MSG(!cli_parse(c, argc, argv, true), "Parsing should fail when choice is not in allowed choices");
+
+    char *err_opt = nullptr;
+    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_NOT_A_CHOICE, "Expected NOT_A_CHOICE error code");
+    ASSERT_MSG(err_opt != nullptr && strcmp(err_opt, "alg") == 0, "Expected offending option to be 'alg'");
 
     cli_destroy(c);
 }
@@ -305,6 +324,33 @@ static void test_duplicate_and_invalid_option_names() {
     cli_destroy(c);
 }
 
+static void test_error_reporting() {
+    cli c = cli_create();
+
+    cli_option opt_in = {
+        .option_name_long = "in",
+        .type = CLI_TYPE_PATH,
+        .required = true
+    };
+    ASSERT_MSG(cli_add_option(c, opt_in), "Failed to add 'in' option");
+
+    char *err_opt = nullptr;
+
+    // 1. Unknown option when fail_on_unknown is true
+    const char *argv_unknown[] = {"program", "--bogus", "-in", "file.txt"};
+    ASSERT_MSG(!cli_parse(c, 4, argv_unknown, true), "Should fail on unknown option when fail_on_unknown is true");
+    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_UNKNOWN, "Expected CLI_PARSE_ERROR_UNKNOWN");
+    ASSERT_MSG(err_opt != nullptr && strcmp(err_opt, "bogus") == 0, "Expected offending option 'bogus'");
+
+    // 2. Missing value for an option requiring an argument
+    const char *argv_missing_val[] = {"program", "-in"};
+    ASSERT_MSG(!cli_parse(c, 2, argv_missing_val, true), "Should fail when required option argument is missing");
+    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_MISSING_VALUE, "Expected CLI_PARSE_ERROR_MISSING_VALUE");
+    ASSERT_MSG(err_opt != nullptr && strcmp(err_opt, "in") == 0, "Expected offending option 'in'");
+
+    cli_destroy(c);
+}
+
 int main() {
     test_basic_parsing();
     test_missing_required();
@@ -315,6 +361,7 @@ int main() {
     test_choice_options();
     test_invalid_choice();
     test_duplicate_and_invalid_option_names();
+    test_error_reporting();
     
     return ASSERT_REPORT();
 }

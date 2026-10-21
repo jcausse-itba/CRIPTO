@@ -31,6 +31,19 @@ typedef enum {
 } cli_option_type;
 
 /**
+ * @brief Error codes reported by the CLI parser when cli_parse fails.
+ */
+typedef enum {
+    CLI_PARSE_ERROR_NONE = 0,           // No error occurred.
+    CLI_PARSE_ERROR_UNKNOWN,            // An unregistered option was encountered (when fail_on_unknown is true).
+    CLI_PARSE_ERROR_MISSING_REQUIRED,   // A required option was not provided.
+    CLI_PARSE_ERROR_MISSING_VALUE,      // An option requiring a value was passed without an argument.
+    CLI_PARSE_ERROR_NOT_A_CHOICE,       // A CLI_TYPE_CHOICE option received a value not in its allowed choices.
+    CLI_PARSE_ERROR_INVALID_VALUE,      // An option's value failed type or format validation (integer, float, path).
+    CLI_PARSE_ERROR_MEMORY              // Memory allocation failure or invalid parser state.
+} cli_error_code;
+
+/**
  * @brief Union holding the value for an option.
  */
 typedef union {
@@ -80,14 +93,22 @@ bool cli_add_option(cli c, cli_option o);
 /**
  * @brief Parses the provided command line arguments based on the added options.
  * 
- * Non-added options are not parsed and effectively ignored.
- * 
  * @param c The CLI parser.
  * @param argc The argument count.
  * @param argv The argument vector.
+ * @param fail_on_unknown If true, unknown options cause parsing to fail with CLI_PARSE_ERROR_UNKNOWN; if false, they are ignored.
  * @return true if all required options are present and types match, false otherwise.
  */
-bool cli_parse(cli c, int argc, const char *argv[]);
+bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown);
+
+/**
+ * @brief Retrieves the error code and offending option name from the last cli_parse call.
+ * 
+ * @param c The CLI parser.
+ * @param option Output pointer to receive the name of the option that caused the failure (or NULL if not applicable).
+ * @return The cli_error_code describing the parse result.
+ */
+cli_error_code cli_get_error(cli c, char **option);
 
 /**
  * @brief Checks whether a given option was explicitly provided on the command line.
