@@ -228,11 +228,15 @@ static void apply_default(cli_option_internal *opt) {
 }
 
 /**
- * @brief Look up an option in the hashmap by name.
+ * @brief Look up an option in the hashmap by name, ignoring any leading dashes.
  * @return Pointer to the internal option, or NULL if not found.
  */
 static cli_option_internal * lookup_option(cli c, const char * name) {
     if (!c || !name) return nullptr;
+    while (*name == '-') {
+        name++;
+    }
+    if (*name == '\0') return nullptr;
     cli_option_internal * opt = nullptr;
     if (HashMap_peek(c->map, (HashMapKey) name, (HashMapValue *) &opt) == HASHMAP_OK) {
         return opt;

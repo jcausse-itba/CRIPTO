@@ -32,9 +32,14 @@ static void test_basic_parsing() {
     ASSERT_MSG(cli_get_integer(c, "i", &val_int), "Failed to retrieve integer 'i'");
     ASSERT_MSG(val_int == 42, "Integer value mismatch");
 
+    // Also test lookup with leading dashes
+    val_int = 0;
+    ASSERT_MSG(cli_get_integer(c, "-i", &val_int), "Failed to retrieve integer '-i'");
+    ASSERT_MSG(val_int == 42, "Integer value mismatch via '-i'");
+
     bool int_is_set = false;
-    ASSERT_MSG(cli_is_set(c, "i", &int_is_set), "Failed to check cli_is_set for 'i'");
-    ASSERT_MSG(int_is_set == true, "'i' should be marked as explicitly set");
+    ASSERT_MSG(cli_is_set(c, "--integer", &int_is_set), "Failed to check cli_is_set for '--integer'");
+    ASSERT_MSG(int_is_set == true, "'--integer' should be marked as explicitly set");
     
     const char *val_str = NULL;
     // We should be able to query it using the long name too
