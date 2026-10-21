@@ -11,7 +11,7 @@
 
 typedef struct {
     cli_option def;
-    bool is_set;
+    bool is_set;                    // true only if explicitly provided on the command line
     bool owns_string;               // true if parsed_value.string_value was strdup'd and must be freed
     cli_option_value parsed_value;
 } cli_option_internal;
@@ -19,6 +19,7 @@ typedef struct {
 struct cli_internal {
     cli_option_internal options[MAX_OPTIONS];
     size_t option_count;
+    bool is_parsed;
     HashMap map;
 };
 
@@ -154,7 +155,9 @@ static bool set_string_value(cli_option_internal * opt, const char * arg, bool o
     }
     opt->parsed_value.string_value = value;
     opt->owns_string = owned;
-    opt->is_set = true;
+    if (owned) {
+        opt->is_set = true;
+    }
     return true;
 }
 
@@ -200,7 +203,7 @@ static bool assign_optarg(cli_option_internal * opt, const char * arg) {
 }
 
 /**
- * @brief Apply the default value to an unset optional option.
+ * @brief Apply the default value to an unset optional option without marking it as user-set.
  */
 static void apply_default(cli_option_internal *opt) {
     switch (opt->def.type) {
@@ -220,9 +223,8 @@ static void apply_default(cli_option_internal *opt) {
         case CLI_TYPE_CHOICE:
             // Points to the caller's string — not owned by us
             set_string_value(opt, opt->def.default_value.string_value, false);
-            return;     // set_string_value already sets is_set to true, so we return early
+            break;
     }
-    opt->is_set = true;
 }
 
 /**
@@ -236,6 +238,14 @@ static cli_option_internal * lookup_option(cli c, const char * name) {
         return opt;
     }
     return nullptr;
+}
+
+/**
+ * @brief Check whether an option has a valid value available to retrieve.
+ */
+static bool has_value(cli c, const cli_option_internal * opt) {
+    if (!c || !c->is_parsed || !opt) return false;
+    return opt->is_set || !opt->def.required;
 }
 
 /**
@@ -342,6 +352,10 @@ bool cli_add_option(cli c, cli_option o) {
 bool cli_parse(cli c, int argc, const char *argv[]) {
     if (!c || !argv || argc < 1) return false;
 
+    for (size_t i = 0; i < c->option_count; i++) {
+        c->options[i].is_set = false;
+    }
+
     // getopt_long_only may permute argv, so work on a mutable copy
     char **argv_copy = malloc(argc * sizeof(char *));
     if (!argv_copy) return false;
@@ -410,6 +424,8 @@ bool cli_parse(cli c, int argc, const char *argv[]) {
         }
     }
 
+    c->is_parsed = true;
+
     free(long_options);
     for (int i = 0; i < argc; i++) free(argv_copy[i]);
     free(argv_copy);
@@ -417,23 +433,30 @@ bool cli_parse(cli c, int argc, const char *argv[]) {
     return success;
 }
 
+bool cli_is_set(cli c, const char * name, bool * out_is_set) {
+    cli_option_internal * opt = lookup_option(c, name);
+    if (!opt || !c->is_parsed) return false;
+    if (out_is_set) *out_is_set = opt->is_set;
+    return true;
+}
+
 bool cli_get_integer(cli c, const char * name, long * out_value) {
     cli_option_internal * opt = lookup_option(c, name);
-    if (!opt || !opt->is_set || opt->def.type != CLI_TYPE_INTEGER) return false;
+    if (!has_value(c, opt) || opt->def.type != CLI_TYPE_INTEGER) return false;
     if (out_value) *out_value = opt->parsed_value.long_value;
     return true;
 }
 
 bool cli_get_float(cli c, const char * name, double * out_value) {
     cli_option_internal * opt = lookup_option(c, name);
-    if (!opt || !opt->is_set || opt->def.type != CLI_TYPE_FLOAT) return false;
+    if (!has_value(c, opt) || opt->def.type != CLI_TYPE_FLOAT) return false;
     if (out_value) *out_value = opt->parsed_value.double_value;
     return true;
 }
 
 bool cli_get_string(cli c, const char * name, const char ** out_value) {
     cli_option_internal * opt = lookup_option(c, name);
-    if (!opt || !opt->is_set) return false;
+    if (!has_value(c, opt)) return false;
     if (opt->def.type != CLI_TYPE_STRING && opt->def.type != CLI_TYPE_PATH && opt->def.type != CLI_TYPE_CHOICE) return false;
     if (out_value) *out_value = opt->parsed_value.string_value;
     return true;
@@ -441,7 +464,7 @@ bool cli_get_string(cli c, const char * name, const char ** out_value) {
 
 bool cli_get_flag(cli c, const char * name, bool * out_value) {
     cli_option_internal * opt = lookup_option(c, name);
-    if (!opt || !opt->is_set || opt->def.type != CLI_TYPE_FLAG) return false;
+    if (!has_value(c, opt) || opt->def.type != CLI_TYPE_FLAG) return false;
     if (out_value) *out_value = opt->parsed_value.bool_value;
     return true;
 }

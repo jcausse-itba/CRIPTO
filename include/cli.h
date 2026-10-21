@@ -90,12 +90,22 @@ bool cli_add_option(cli c, cli_option o);
 bool cli_parse(cli c, int argc, const char *argv[]);
 
 /**
+ * @brief Checks whether a given option was explicitly provided on the command line.
+ * 
+ * @param c The CLI parser.
+ * @param name The short or long name of the option.
+ * @param out_is_set Pointer to store true if the option was explicitly passed by the user, false if omitted/defaulted.
+ * @return true if the option exists and cli_parse has been called, false otherwise.
+ */
+bool cli_is_set(cli c, const char *name, bool *out_is_set);
+
+/**
  * @brief Retrieves the parsed integer value for a given option.
  * 
  * @param c The CLI parser.
  * @param name The short or long name of the option.
  * @param out_value Pointer to store the parsed value.
- * @return true if the option was set and is of type integer, false otherwise.
+ * @return true if the option has a value and is of type integer, false otherwise.
  */
 bool cli_get_integer(cli c, const char *name, long *out_value);
 
@@ -105,7 +115,7 @@ bool cli_get_integer(cli c, const char *name, long *out_value);
  * @param c The CLI parser.
  * @param name The short or long name of the option.
  * @param out_value Pointer to store the parsed value.
- * @return true if the option was set and is of type float, false otherwise.
+ * @return true if the option has a value and is of type float, false otherwise.
  */
 bool cli_get_float(cli c, const char *name, double *out_value);
 
@@ -115,7 +125,7 @@ bool cli_get_float(cli c, const char *name, double *out_value);
  * @param c The CLI parser.
  * @param name The short or long name of the option.
  * @param out_value Pointer to store the parsed string pointer.
- * @return true if the option was set and is of type string/path/choice, false otherwise.
+ * @return true if the option has a value and is of type string/path/choice, false otherwise.
  */
 bool cli_get_string(cli c, const char *name, const char **out_value);
 
@@ -125,7 +135,7 @@ bool cli_get_string(cli c, const char *name, const char **out_value);
  * @param c The CLI parser.
  * @param name The short or long name of the option.
  * @param out_value Pointer to store the parsed boolean value.
- * @return true if the option was set and is of type flag, false otherwise.
+ * @return true if the option has a value and is of type flag, false otherwise.
  */
 bool cli_get_flag(cli c, const char *name, bool *out_value);
 
