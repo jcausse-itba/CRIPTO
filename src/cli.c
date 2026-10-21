@@ -4,6 +4,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <regex.h>
+#include <errno.h>
 
 #define MAX_OPTIONS 128
 
@@ -73,24 +74,28 @@ static size_t strip_leading_dashes(char *buf, size_t buf_size) {
 
 /**
  * @brief Attempt to parse an optarg as an integer.
- * @return true on success, false if the string is not a valid integer.
+ * @return true on success, false if the string is empty, overflows, or is not a valid integer.
  */
 static bool parse_integer(const char * str, long * out) {
+    if (!str || *str == '\0') return false;
     char *endptr;
+    errno = 0;
     long val = strtol(str, &endptr, 10);
-    if (*endptr != '\0') return false;
+    if (endptr == str || *endptr != '\0' || errno == ERANGE) return false;
     *out = val;
     return true;
 }
 
 /**
  * @brief Attempt to parse an optarg as a double.
- * @return true on success, false if the string is not a valid double.
+ * @return true on success, false if the string is empty, overflows, or is not a valid double.
  */
 static bool parse_float(const char * str, double * out) {
+    if (!str || *str == '\0') return false;
     char *endptr;
+    errno = 0;
     double val = strtod(str, &endptr);
-    if (*endptr != '\0') return false;
+    if (endptr == str || *endptr != '\0' || errno == ERANGE) return false;
     *out = val;
     return true;
 }

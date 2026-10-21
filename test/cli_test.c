@@ -116,10 +116,14 @@ static void test_invalid_types() {
     };
     ASSERT(cli_add_option(c, opt_int));
 
-    const char *argv[] = {"program", "-i", "not_an_integer"};
-    int argc = 3;
+    const char *argv_str[] = {"program", "-i", "not_an_integer"};
+    ASSERT_MSG(!cli_parse(c, 3, argv_str), "Parsing should fail when passing string to integer option");
 
-    ASSERT_MSG(!cli_parse(c, argc, argv), "Parsing should fail when passing string to integer option");
+    const char *argv_empty[] = {"program", "-i", ""};
+    ASSERT_MSG(!cli_parse(c, 3, argv_empty), "Parsing should fail when passing empty string to integer option");
+
+    const char *argv_overflow[] = {"program", "-i", "9999999999999999999999999999999999999999"};
+    ASSERT_MSG(!cli_parse(c, 3, argv_overflow), "Parsing should fail on integer overflow");
 
     cli_destroy(c);
 }
