@@ -61,6 +61,32 @@ typedef union {
 
 /**
  * @brief Definition of a single command line option.
+ *
+ * @details Field rules and interactions when creating a @ref cli_option:
+ * - **Option Names (`option_name_short` & `option_name_long`):**
+ *   - Leading dashes (e.g., `"-a"`, `"--alpha"`) are optional and automatically stripped upon registration.
+ *   - At least one of `option_name_short` or `option_name_long` must be non-empty (after stripping dashes).
+ *   - `option_name_short`, if provided, must be a single character (after stripping dashes).
+ *   - Both names must be unique across all registered options and cannot be identical to each other.
+ *
+ * - **Requirement & Default Values (`required` & `default_value`):**
+ *   - When `required` is `true`: the option must be explicitly passed on the command line (otherwise `cli_parse`
+ *     fails with @ref CLI_PARSE_ERROR_MISSING_REQUIRED), and `default_value` is ignored.
+ *   - When `required` is `false`: if the option is omitted on the command line, `default_value` is used for
+ *     @ref CLI_TYPE_INTEGER (`long_value`), @ref CLI_TYPE_FLOAT (`double_value`), and @ref CLI_TYPE_STRING /
+ *     @ref CLI_TYPE_PATH / @ref CLI_TYPE_CHOICE (`string_value`). Note that default strings are referenced
+ *     directly (not duplicated), so they must remain valid for the lifetime of the parser.
+ *   - For @ref CLI_TYPE_FLAG: `default_value` is **always ignored**. Flags take no arguments on the command line,
+ *     always default to `false` when omitted (if `required` is `false`), and evaluate to `true` when present.
+ *
+ * - **Choices (`choices`, `case_insensitive` & `type`):**
+ *   - When `type` is @ref CLI_TYPE_CHOICE: `choices` **must** be a non-empty, `NULL`-terminated array of allowed
+ *     strings (e.g., `(const char *[]){"AES128", "AES256", nullptr}`). Registration via `cli_add_option` fails if
+ *     `choices` is `NULL` or empty. The array and its strings are not copied and must outlive the parser.
+ *   - `case_insensitive` controls how user input is matched against `choices`: when `false` (the default if omitted),
+ *     matching is case-sensitive; when `true`, matching is case-insensitive and the canonical string from `choices`
+ *     is stored as the parsed value.
+ *   - For all other option types: `choices` and `case_insensitive` are unused and should be omitted (`NULL` / `false`).
  */
 typedef struct {
     char                    option_name_short[CLI_MAX_SHORT_OPTION_NAME];  // Short option name, e.g., "a" or "-a".
@@ -69,6 +95,7 @@ typedef struct {
     bool                    required;                           // True if the option must be provided by the user.
     cli_option_value        default_value;                      // Default value if the option is not provided (unused if required is true or for flags).
     const char **           choices;                            // NULL-terminated array of valid strings for CLI_TYPE_CHOICE options.
+    bool                    case_insensitive;                   // If true, CLI_TYPE_CHOICE matching is case-insensitive (defaults to false, i.e., case-sensitive).
 } cli_option;
 
 //------------------------------------------------------------------------------------------------------------------------------------------

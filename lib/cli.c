@@ -8,6 +8,7 @@
 #include "hashmap.h"
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <getopt.h>
 #include <regex.h>
 #include <errno.h>
@@ -154,17 +155,39 @@ static bool validate_path(cli c, const char * str) {
 }
 
 /**
- * @brief Validate a string against a NULL-terminated array of allowed choices.
- * @return true if the string matches one of the choices, false otherwise.
+ * @brief Compare two strings case-insensitively.
+ * @details     This is needed because strcasecmp is POSIX, not standard ISO C.
  */
-static bool validate_choice(const char * str, const char ** choices) {
-    if (!str || !choices) return false;
+static bool str_case_eq (const char * a, const char * b) {
+    while (*a && *b) {
+        if (tolower((unsigned char) *a) != tolower((unsigned char) *b)) {
+            return false;
+        }
+        a++;
+        b++;
+    }
+    return *a == *b;
+}
+
+/**
+ * @brief Compare two strings either case-sensitively or case-insensitively.
+ */
+static bool str_equals(const char * a, const char * b, bool case_insensitive) {
+    return case_insensitive ? str_case_eq(a, b) : strcmp(a, b) == 0;
+}
+
+/**
+ * @brief Match a string against a NULL-terminated array of allowed choices.
+ * @return Pointer to the matched canonical choice string from the array, or NULL if no match.
+ */
+static const char * match_choice(const char * str, const char ** choices, bool case_insensitive) {
+    if (!str || !choices) return nullptr;
     for (size_t i = 0; choices[i] != nullptr; i++) {
-        if (strcmp(str, choices[i]) == 0) {
-            return true;
+        if (str_equals(str, choices[i], case_insensitive)) {
+            return choices[i];
         }
     }
-    return false;
+    return nullptr;
 }
 
 /**
@@ -264,14 +287,13 @@ static bool assign_optarg(cli c, cli_option_internal * opt, const char * arg) {
             return set_bool_value(opt, true);
         }
         case CLI_TYPE_CHOICE: {
-            if (!validate_choice(arg, opt->def.choices)) {
+            const char * matched = match_choice(arg, opt->def.choices, opt->def.case_insensitive);
+            if (!matched) {
                 set_error(c, CLI_PARSE_ERROR_NOT_A_CHOICE, name);
                 return false;
             }
-            if (!set_string_value(opt, arg, true)) {
-                set_error(c, CLI_PARSE_ERROR_OTHER, name);
-                return false;
-            }
+            set_string_value(opt, matched, false);
+            opt->is_set = true;     // Mark opt as set, even though we do not own the value
             return true;
         }
     }

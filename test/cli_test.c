@@ -246,6 +246,32 @@ static void test_choice_options() {
     ASSERT_MSG(cli_get_string(c, "m", &val_mode), "Failed to retrieve default choice 'm'");
     ASSERT_MSG(strcmp(val_mode, "cbc") == 0, "Default choice 'm' value mismatch");
 
+    // Case-sensitive by default: lowercase "lsbi" must be rejected
+    const char *argv_wrong_case[] = {"program", "-steg", "lsbi"};
+    ASSERT_MSG(!cli_parse(c, 3, argv_wrong_case, true), "Default case-sensitive choice should reject wrong case");
+    char *err_opt = nullptr;
+    ASSERT_MSG(cli_get_error(c, &err_opt) == CLI_PARSE_ERROR_NOT_A_CHOICE, "Expected NOT_A_CHOICE on case mismatch");
+
+    // Case-insensitive choice option: should match any casing and store canonical choice string
+    const char *cipher_choices[] = {"AES128", "AES192", "AES256", "3DES", nullptr};
+    cli_option opt_cipher = {
+        .option_name_short = "a",
+        .option_name_long = "alg",
+        .type = CLI_TYPE_CHOICE,
+        .required = false,
+        .default_value = { .string_value = "AES128" },
+        .choices = cipher_choices,
+        .case_insensitive = true
+    };
+    ASSERT_MSG(cli_add_option(c, opt_cipher), "Failed to add case-insensitive cipher choice option");
+
+    const char *argv_ci[] = {"program", "-steg", "LSB1", "-a", "aes256"};
+    ASSERT_MSG(cli_parse(c, 5, argv_ci, true), "Case-insensitive choice should accept 'aes256' for 'AES256'");
+
+    const char *val_cipher = nullptr;
+    ASSERT_MSG(cli_get_string(c, "alg", &val_cipher), "Failed to retrieve choice 'alg'");
+    ASSERT_MSG(strcmp(val_cipher, "AES256") == 0, "Expected canonical choice string 'AES256' to be stored");
+
     cli_destroy(c);
 }
 
