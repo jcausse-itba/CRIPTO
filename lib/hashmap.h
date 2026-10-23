@@ -1,6 +1,7 @@
 /**
  * @file        hashmap.h
  * @brief       Implementation of a HashMap.
+ * @date        May, 2024.
 */
 
 #ifndef __HASHMAP_H__

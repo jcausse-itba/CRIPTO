@@ -1,3 +1,9 @@
+/**
+ * @file        cli.c
+ * @brief       Command Line Arguments Parser.
+ * @date        October, 2026.
+*/
+
 #include "cli.h"
 #include "hashmap.h"
 #include <stdlib.h>

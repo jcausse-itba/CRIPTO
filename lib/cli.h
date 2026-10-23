@@ -1,3 +1,9 @@
+/**
+ * @file        cli.h
+ * @brief       Command Line Arguments Parser.
+ * @date        October, 2026.
+*/
+
 #ifndef CLI_H
 #define CLI_H
 
@@ -77,15 +83,15 @@ cli cli_create();
 /**
  * @brief Destroys a CLI parser object and frees associated resources.
  * 
- * @param c The CLI parser to destroy. If NULL, does nothing.
+ * @param[in]   c       The CLI parser to destroy. If NULL, does nothing.
  */
 void cli_destroy(cli c);
 
 /**
  * @brief Adds an option specification to the CLI parser.
  * 
- * @param c The CLI parser.
- * @param o The option definition to add.
+ * @param[in]   c       The CLI parser.
+ * @param[in]   o       The option definition to add.
  * @return true on success, false if the parser is invalid or maximum options reached.
  */
 bool cli_add_option(cli c, cli_option o);
@@ -93,10 +99,11 @@ bool cli_add_option(cli c, cli_option o);
 /**
  * @brief Parses the provided command line arguments based on the added options.
  * 
- * @param c The CLI parser.
- * @param argc The argument count.
- * @param argv The argument vector.
- * @param fail_on_unknown If true, unknown options cause parsing to fail with CLI_PARSE_ERROR_UNKNOWN; if false, they are ignored.
+ * @param[in]   c       The CLI parser.
+ * @param[in]   argc    The argument count.
+ * @param[in]   argv    The argument vector.
+ * @param[in]   fail_on_unknown     If true, unknown options cause parsing to fail with CLI_PARSE_ERROR_UNKNOWN;
+ *                                  if false, they are ignored.
  * @return true if all required options are present and types match, false otherwise.
  */
 bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown);
@@ -104,8 +111,8 @@ bool cli_parse(cli c, int argc, const char *argv[], bool fail_on_unknown);
 /**
  * @brief Retrieves the error code and offending option name from the last cli_parse call.
  * 
- * @param c The CLI parser.
- * @param option Output pointer to receive the name of the option that caused the failure (or NULL if not applicable).
+ * @param[in]   c       The CLI parser.
+ * @param[out]  option  Output pointer to receive the name of the option that caused the failure (or NULL if not applicable).
  * @return The cli_error_code describing the parse result.
  */
 cli_error_code cli_get_error(cli c, char **option);
@@ -115,18 +122,18 @@ cli_error_code cli_get_error(cli c, char **option);
  * 
  * The string is allocated on demand when called and owned by the CLI parser (freed by cli_destroy).
  * 
- * @param c The CLI parser.
- * @param prog_name The program name to display in the usage synopsis (defaults to "program" if NULL or empty).
+ * @param[in]   c       The CLI parser.
+ * @param[in]   prog_name   The program name to display in the usage synopsis (defaults to "program" if NULL or empty).
  * @return Pointer to the generated usage string, or NULL on failure.
  */
-const char *cli_usage(cli c, const char *prog_name);
+const char * cli_usage(cli c, const char *prog_name);
 
 /**
  * @brief Checks whether a given option was explicitly provided on the command line.
  * 
- * @param c The CLI parser.
- * @param name The short or long name of the option.
- * @param out_is_set Pointer to store true if the option was explicitly passed by the user, false if omitted/defaulted.
+ * @param[in]   c       The CLI parser.
+ * @param[in]   name    The short or long name of the option.
+ * @param[out]  out_is_set  Pointer to store true if the option was explicitly passed by the user, false if omitted/defaulted.
  * @return true if the option exists and cli_parse has been called, false otherwise.
  */
 bool cli_is_set(cli c, const char *name, bool *out_is_set);
@@ -134,9 +141,9 @@ bool cli_is_set(cli c, const char *name, bool *out_is_set);
 /**
  * @brief Retrieves the parsed integer value for a given option.
  * 
- * @param c The CLI parser.
- * @param name The short or long name of the option.
- * @param out_value Pointer to store the parsed value.
+ * @param[in]   c       The CLI parser.
+ * @param[in]   name    The short or long name of the option.
+ * @param[out]  out_value   Pointer to store the parsed value.
  * @return true if the option has a value and is of type integer, false otherwise.
  */
 bool cli_get_integer(cli c, const char *name, long *out_value);
@@ -144,9 +151,9 @@ bool cli_get_integer(cli c, const char *name, long *out_value);
 /**
  * @brief Retrieves the parsed float value for a given option.
  * 
- * @param c The CLI parser.
- * @param name The short or long name of the option.
- * @param out_value Pointer to store the parsed value.
+ * @param[in]   c       The CLI parser.
+ * @param[in]   name    The short or long name of the option.
+ * @param[out]  out_value   Pointer to store the parsed value.
  * @return true if the option has a value and is of type float, false otherwise.
  */
 bool cli_get_float(cli c, const char *name, double *out_value);
@@ -154,9 +161,9 @@ bool cli_get_float(cli c, const char *name, double *out_value);
 /**
  * @brief Retrieves the parsed string, path, or choice value for a given option.
  * 
- * @param c The CLI parser.
- * @param name The short or long name of the option.
- * @param out_value Pointer to store the parsed string pointer.
+ * @param[in]   c       The CLI parser.
+ * @param[in]   name    The short or long name of the option.
+ * @param[out]  out_value   Pointer to store the parsed string pointer.
  * @return true if the option has a value and is of type string/path/choice, false otherwise.
  */
 bool cli_get_string(cli c, const char *name, const char **out_value);
@@ -164,9 +171,9 @@ bool cli_get_string(cli c, const char *name, const char **out_value);
 /**
  * @brief Retrieves the parsed boolean value for a given flag option.
  * 
- * @param c The CLI parser.
- * @param name The short or long name of the option.
- * @param out_value Pointer to store the parsed boolean value.
+ * @param[in]   c       The CLI parser.
+ * @param[in]   name    The short or long name of the option.
+ * @param[out]  out_value   Pointer to store the parsed boolean value.
  * @return true if the option has a value and is of type flag, false otherwise.
  */
 bool cli_get_flag(cli c, const char *name, bool *out_value);

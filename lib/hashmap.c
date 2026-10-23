@@ -1,6 +1,7 @@
 /**
  * @file        hashmap.c
  * @brief       Implementation of a HashMap.
+ * @date        May, 2024.
 */
 
 #include "hashmap.h"
