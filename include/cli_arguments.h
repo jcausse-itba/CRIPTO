@@ -16,6 +16,8 @@
 #define CLI_OPT_CIPHER_MODE_SHORT       "m"
 #define CLI_OPT_CIPHER_MODE_LONG        "cipher-mode"
 #define CLI_OPT_PASS_LONG               "pass"
+#define CLI_OPT_VERBOSE_SHORT           "v"
+#define CLI_OPT_VERBOSE_LONG            "verbose"
 
 static const char * STEGANOGRAPHY_CHOICES[] = {
     "LSB1",
@@ -105,10 +107,17 @@ static const cli_option COMMAND_LINE_OPTIONS[] = {
         .type = CLI_TYPE_STRING,
         .required = false,
         .default_value = {.string_value = ""}
+    },
+    {
+        .option_name_short = CLI_OPT_VERBOSE_SHORT,
+        .option_name_long = CLI_OPT_VERBOSE_LONG,
+        .type = CLI_TYPE_FLAG
     }
 
 };
 
 cli parse_command_line(int argc, const char * argv[]);
+void print_config(cli c);
+bool verbose(cli c);
 
 #endif // _CLI_ARGUMENTS_H_

@@ -150,11 +150,65 @@ cli parse_command_line(int argc, const char * argv[]) {
     size_t count = sizeof(MULTI_ARG_VALIDATIONS) / sizeof(multi_argument_validation_t);
     for (size_t i = 0; i < count; i++) {
         if (! MULTI_ARG_VALIDATIONS[i].fun(c)) {
-            show_err(c, argv[0], "%s\n", MULTI_ARG_VALIDATIONS[i].msg);
+            show_err(c, argv[0], "Error:\n\t- %s\n", MULTI_ARG_VALIDATIONS[i].msg);
             cli_destroy(c);
             return nullptr;
         }
     }
 
     return c;
+}
+
+void print_config(cli c) {
+    if (!c) return;
+
+    size_t size = sizeof(COMMAND_LINE_OPTIONS) / sizeof(COMMAND_LINE_OPTIONS[0]);
+    printf("Configuration:\n");
+
+    for (size_t i = 0; i < size; i++) {
+        const cli_option * opt = &COMMAND_LINE_OPTIONS[i];
+        const char * name = opt->option_name_long[0] != '\0' ? opt->option_name_long : opt->option_name_short;
+        bool is_set = false;
+        cli_is_set(c, name, &is_set);
+
+        printf("  - %-18s : ", name);
+        switch (opt->type) {
+            case CLI_TYPE_FLAG: {
+                bool val = false;
+                if (cli_get_flag(c, name, &val)) {
+                    printf("%s", val ? "true" : "false");
+                }
+                break;
+            }
+            case CLI_TYPE_INTEGER: {
+                long val = 0;
+                if (cli_get_integer(c, name, &val)) {
+                    printf("%ld", val);
+                }
+                break;
+            }
+            case CLI_TYPE_FLOAT: {
+                double val = 0.0;
+                if (cli_get_float(c, name, &val)) {
+                    printf("%f", val);
+                }
+                break;
+            }
+            case CLI_TYPE_STRING:
+            case CLI_TYPE_PATH:
+            case CLI_TYPE_CHOICE: {
+                const char * val = nullptr;
+                if (cli_get_string(c, name, &val)) {
+                    printf("\"%s\"", val ? val : "(null)");
+                }
+                break;
+            }
+        }
+        printf(" (%s)\n", is_set ? "set" : "default");
+    }
+}
+
+bool verbose(cli c) {
+    bool val = false, res = cli_is_set(c, CLI_OPT_VERBOSE_LONG, &val);
+    return val && res;
 }

@@ -440,6 +440,8 @@ static char * build_usage_string(cli c, const char * prog_name) {
     APPEND_STR(prog);
 
     for (size_t i = 0; i < c->option_count; i++) {
+        APPEND_STR("\n\t");
+
         const cli_option * def = &c->options[i].def;
         const bool has_short = def->option_name_short[0] != '\0';
         const bool has_long  = def->option_name_long[0] != '\0';
