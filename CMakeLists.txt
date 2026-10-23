@@ -30,17 +30,22 @@ if(ENABLE_SANITIZERS AND NOT MSVC)
     add_link_options(-fsanitize=address,undefined)
 endif()
 
-# Project core library (all source files in src/ except main.c)
-file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
+# Project core library (all source files in src/ except main.c, and lib/)
+file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib/*.c"
+)
 list(REMOVE_ITEM CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.c")
 file(GLOB_RECURSE CORE_HEADERS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
 )
 
 add_library(stego_core STATIC ${CORE_SOURCES} ${CORE_HEADERS})
 target_include_directories(stego_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 

@@ -1,6 +1,6 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -Werror -pedantic -std=c23 -g -fsanitize=address,undefined -I../include -I.
-SRCDIR := ../src
+CFLAGS := -Wall -Wextra -Werror -pedantic -std=c23 -g -fsanitize=address,undefined -I../lib -I.
+SRCDIR := ../lib
 BUILDDIR := build
 
 # Automatically discover all test_*.c and *_test.c files
