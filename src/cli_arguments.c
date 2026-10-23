@@ -1,0 +1,160 @@
+#include <stdio.h>
+#include <stdarg.h>
+#include "cli_arguments.h"
+
+// PARSER ERROR HANDLING
+
+#define PARSER_ERR_DESC(XX) \
+    XX(CLI_PARSE_ERROR_UNKNOWN_OPTION,          "Option unrecognized"                       ) \
+    XX(CLI_PARSE_ERROR_MISSING_REQUIRED,        "Missing required parameter"                ) \
+    XX(CLI_PARSE_ERROR_MISSING_VALUE,           "Missing value for required parameter"      ) \
+    XX(CLI_PARSE_ERROR_NOT_A_CHOICE,            "Entered value is not a valid choice"       ) \
+    XX(CLI_PARSE_ERROR_INVALID_VALUE,           "Invalid option value"                      )
+
+static const char * err_desc(cli_error_code code) {
+    switch (code) {
+        #define XX(_code, _desc) case _code: return _desc;
+        PARSER_ERR_DESC(XX)
+        #undef XX
+        default: return "Memory allocation error";
+    }
+}
+
+// --------------------------------------------------------------------------------------------------
+
+// MULTI-PARAMETER ERROR HANDLING
+
+static bool embed_extract_required(cli c) {
+    bool embed_set = false, extract_set = false;
+
+    cli_is_set(c, "embed", &embed_set);
+    cli_is_set(c, "extract", &extract_set);
+
+    // Either embed or extract must be set
+    return embed_set || extract_set;    
+}
+
+static bool embed_extract_mutual_exclusion(cli c) {
+    bool embed_set = false, extract_set = false;
+
+    cli_is_set(c, "embed", &embed_set);
+    cli_is_set(c, "extract", &extract_set);
+
+    // embed and extract cannot be set at the same time
+    return !(embed_set && extract_set);    
+}
+
+static bool embed_in_defined(cli c) {
+    bool embed_set = false, in_set = false;
+
+    cli_is_set(c, "embed", &embed_set);
+    cli_is_set(c, "in", &in_set);
+
+    return !embed_set || in_set;
+}
+
+static bool extract_in_undefined(cli c) {
+    bool extract_set = false, in_set = false;
+
+    cli_is_set(c, "extract", &extract_set);
+    cli_is_set(c, "in", &in_set);
+
+    return !extract_set || !in_set;
+}
+
+static bool encryption_decryption_requires_password(cli c) {
+    bool cipher_set = false, mode_set = false, password_set = false;
+
+    cli_is_set(c, "cipher-algorithm", &cipher_set);
+    cli_is_set(c, "cipher-mode", &mode_set);
+    cli_is_set(c, "pass", &password_set);
+
+    return (!cipher_set && !mode_set) || password_set;
+}
+
+typedef struct {
+    bool (* fun) (cli c);
+    const char * msg;
+} multi_argument_validation_t;
+
+static const multi_argument_validation_t MULTI_ARG_VALIDATIONS[] = {
+    {
+        .fun = embed_extract_required,             
+        .msg = "Either 'embed' or 'extract' must be selected."              
+    },
+    {
+        .fun = embed_extract_mutual_exclusion,     
+        .msg = "Parameters 'embed' and 'extract' are mutually exclusive."
+    },
+    {
+        .fun = embed_in_defined,
+        .msg = "When using 'embed', 'in' must be defined."
+    },
+    {
+        .fun = extract_in_undefined,
+        .msg = "When using 'extract', 'in' must not be defined."
+    },
+    {
+        .fun = encryption_decryption_requires_password,
+        .msg = "When using 'a' or 'm', 'pass' must be defined."
+    }
+};
+
+// --------------------------------------------------------------------------------------------------
+
+static void show_err(cli c, const char * prog_name, const char * restrict fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n\n%s\n", cli_usage(c, prog_name));
+    va_end(ap);
+}
+
+cli parse_command_line(int argc, const char * argv[]) {
+    size_t size = sizeof(COMMAND_LINE_OPTIONS) / sizeof(COMMAND_LINE_OPTIONS[0]);
+    bool has_error = false;
+    
+    // Initialize CLI parser
+    cli c = cli_create();
+    if (!c) {
+        return nullptr;
+    }
+
+    // Load options
+    for (size_t i = 0; i < size && !has_error; i++) {
+        has_error = !cli_add_option(c, COMMAND_LINE_OPTIONS[i]);
+    }
+
+    // Parse
+    if (!has_error) {
+        has_error = !cli_parse(c, argc, argv, true);
+    }
+
+    // Show error messages and usage on parser failure
+    if (has_error) {
+        char * error_option = nullptr;
+        cli_error_code error_code = cli_get_error(c, &error_option);
+        
+        if (error_option){
+            show_err(c, argv[0], "Error:\n\t- %s\n\t- On parameter: %s\n", err_desc(error_code), error_option);
+        }
+        else {
+            show_err(c, argv[0], "Error:\n\t- %s\n", err_desc(error_code));
+        }
+
+        cli_destroy(c);
+        return nullptr;
+    }
+
+    // Multi-parameter checks
+    size_t count = sizeof(MULTI_ARG_VALIDATIONS) / sizeof(multi_argument_validation_t);
+    for (size_t i = 0; i < count; i++) {
+        if (! MULTI_ARG_VALIDATIONS[i].fun(c)) {
+            show_err(c, argv[0], "%s\n", MULTI_ARG_VALIDATIONS[i].msg);
+            cli_destroy(c);
+            return nullptr;
+        }
+    }
+
+    return c;
+}
