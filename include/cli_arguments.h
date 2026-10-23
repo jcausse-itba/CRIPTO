@@ -3,6 +3,20 @@
 
 #include "cli.h"
 
+// CLI Option Name Constants
+#define CLI_OPT_EMBED_LONG              "embed"
+#define CLI_OPT_IN_LONG                 "in"
+#define CLI_OPT_EXTRACT_LONG            "extract"
+#define CLI_OPT_PICTURE_SHORT           "p"
+#define CLI_OPT_PICTURE_LONG            "picture"
+#define CLI_OPT_OUT_LONG                "out"
+#define CLI_OPT_STEG_LONG               "steg"
+#define CLI_OPT_CIPHER_ALG_SHORT        "a"
+#define CLI_OPT_CIPHER_ALG_LONG         "cipher-algorithm"
+#define CLI_OPT_CIPHER_MODE_SHORT       "m"
+#define CLI_OPT_CIPHER_MODE_LONG        "cipher-mode"
+#define CLI_OPT_PASS_LONG               "pass"
+
 static const char * STEGANOGRAPHY_CHOICES[] = {
     "LSB1",
     "LSB4",
@@ -32,35 +46,35 @@ static const cli_option COMMAND_LINE_OPTIONS[] = {
     
     // EMBEDDING-ONLY
     {
-        .option_name_long = "embed",
+        .option_name_long = CLI_OPT_EMBED_LONG,
         .type = CLI_TYPE_FLAG
     },
     {
-        .option_name_long = "in",
+        .option_name_long = CLI_OPT_IN_LONG,
         .type = CLI_TYPE_PATH,
         .required = false
     },
 
     // EXTRACTION-ONLY
     {
-        .option_name_long = "extract",
+        .option_name_long = CLI_OPT_EXTRACT_LONG,
         .type = CLI_TYPE_FLAG
     },
 
     // COMMON REQUIRED
     {
-        .option_name_short = "p",
-        .option_name_long = "picture",
+        .option_name_short = CLI_OPT_PICTURE_SHORT,
+        .option_name_long = CLI_OPT_PICTURE_LONG,
         .type = CLI_TYPE_PATH,
         .required = true
     },
     {
-        .option_name_long = "out",
+        .option_name_long = CLI_OPT_OUT_LONG,
         .type = CLI_TYPE_PATH,
         .required = true
     },
     {
-        .option_name_long = "steg",
+        .option_name_long = CLI_OPT_STEG_LONG,
         .type = CLI_TYPE_CHOICE,
         .required = true,
         .choices = STEGANOGRAPHY_CHOICES,
@@ -69,8 +83,8 @@ static const cli_option COMMAND_LINE_OPTIONS[] = {
 
     // COMMON OPTIONAL
     {
-        .option_name_short = "a",
-        .option_name_long = "cipher-algorithm",
+        .option_name_short = CLI_OPT_CIPHER_ALG_SHORT,
+        .option_name_long = CLI_OPT_CIPHER_ALG_LONG,
         .type = CLI_TYPE_CHOICE,
         .required = false,
         .default_value = {.string_value = DEFAULT_CIPHER},
@@ -78,8 +92,8 @@ static const cli_option COMMAND_LINE_OPTIONS[] = {
         .case_insensitive = true,
     },
     {
-        .option_name_short = "m",
-        .option_name_long = "cipher-mode",
+        .option_name_short = CLI_OPT_CIPHER_MODE_SHORT,
+        .option_name_long = CLI_OPT_CIPHER_MODE_LONG,
         .type = CLI_TYPE_CHOICE,
         .required = false,
         .default_value = {.string_value = DEFAULT_MODE},
@@ -87,7 +101,7 @@ static const cli_option COMMAND_LINE_OPTIONS[] = {
         .case_insensitive = true
     },
     {
-        .option_name_long = "pass",
+        .option_name_long = CLI_OPT_PASS_LONG,
         .type = CLI_TYPE_STRING,
         .required = false,
         .default_value = {.string_value = ""}
