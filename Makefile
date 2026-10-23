@@ -10,7 +10,7 @@ all:
 test:
 	@cmake -B $(BUILD_DIR) -S .
 	@cmake --build $(BUILD_DIR)
-	@ctest --test-dir $(BUILD_DIR) --output-on-failure
+	@ctest --test-dir $(BUILD_DIR) --verbose
 
 clean:
 	@rm -rf $(BUILD_DIR) stegobmp *.o
