@@ -217,10 +217,10 @@ static bool set_double_value(cli_option_internal * opt, const char * arg) {
  * @return true on success, false if strdup fails (OOM).
  */
 static bool set_string_value(cli_option_internal * opt, const char * arg, bool owned) {
-    char * value = owned ? strdup(arg) : (char *) arg;
+    const char * value = owned ? strdup(arg) : arg;
     if (owned && !value) return false;
     if (opt->owns_string && opt->parsed_value.string_value) {
-        free(opt->parsed_value.string_value);
+        free((void *) opt->parsed_value.string_value);
     }
     opt->parsed_value.string_value = value;
     opt->owns_string = owned;
@@ -519,7 +519,7 @@ void cli_destroy(cli c) {
     for (size_t i = 0; i < c->option_count; i++) {
         cli_option_internal * opt = &c->options[i];
         if (opt->owns_string && opt->parsed_value.string_value) {
-            free(opt->parsed_value.string_value);
+            free((void *) opt->parsed_value.string_value);
         }
     }
 

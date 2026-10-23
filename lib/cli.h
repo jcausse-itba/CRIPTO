@@ -53,10 +53,10 @@ typedef enum {
  * @brief Union holding the value for an option.
  */
 typedef union {
-    long    long_value;     // Value for integer options.
-    double  double_value;   // Value for float options.
-    char *  string_value;   // Value for string, path, and choice options.
-    bool    bool_value;     // Value for flag options (parsed value only; flags always default to false).
+    long            long_value;         // Value for integer options.
+    double          double_value;       // Value for float options.
+    const char *    string_value;       // Value for string, path, and choice options.
+    bool            bool_value;         // Value for flag options (parsed value only; flags always default to false).
 } cli_option_value;
 
 /**
