@@ -408,7 +408,7 @@ static void test_usage_generation() {
     const char *usage = cli_usage(c, "stegobmp");
     ASSERT_MSG(usage != nullptr, "cli_usage should return a non-NULL string");
     ASSERT_MSG(
-        strcmp(usage, "Usage: stegobmp [-e|--embed] --in <path> -s|--steg <LSB1|LSB4|LSBI>\n") == 0,
+        strcmp(usage, "Usage: stegobmp\n\t [-e|--embed]\n\t --in <path>\n\t -s|--steg <LSB1|LSB4|LSBI>\n") == 0,
         "Generated usage string did not match expected format"
     );
 
