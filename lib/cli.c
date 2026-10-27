@@ -6,9 +6,9 @@
 
 #include "cli.h"
 #include "hashmap.h"
+#include "string_utils.h"
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 #include <getopt.h>
 #include <regex.h>
 #include <errno.h>
@@ -152,28 +152,6 @@ static bool validate_path(cli c, const char * str) {
         c->path_regex_compiled = true;
     }
     return regexec(&c->path_regex, str, 0, nullptr, 0) == 0;
-}
-
-/**
- * @brief Compare two strings case-insensitively.
- * @details     This is needed because strcasecmp is POSIX, not standard ISO C.
- */
-static bool str_case_eq (const char * a, const char * b) {
-    while (*a && *b) {
-        if (tolower((unsigned char) *a) != tolower((unsigned char) *b)) {
-            return false;
-        }
-        a++;
-        b++;
-    }
-    return *a == *b;
-}
-
-/**
- * @brief Compare two strings either case-sensitively or case-insensitively.
- */
-static bool str_equals(const char * a, const char * b, bool case_insensitive) {
-    return case_insensitive ? str_case_eq(a, b) : strcmp(a, b) == 0;
 }
 
 /**
