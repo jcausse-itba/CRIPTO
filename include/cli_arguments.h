@@ -3,6 +3,8 @@
 
 #include "cli.h"
 
+#define PICTURE_FILE_EXTENSION ".bmp"
+
 // CLI Option Name Constants
 #define CLI_OPT_EMBED_LONG              "embed"
 #define CLI_OPT_IN_LONG                 "in"

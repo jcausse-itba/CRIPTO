@@ -13,7 +13,6 @@
 #include <regex.h>
 #include <errno.h>
 
-#define MAX_OPTIONS 128
 #define USAGE_CHUNK_SIZE 50
 
 #define PATH_REGEX "^[a-zA-Z0-9_./\\\\-]+$"

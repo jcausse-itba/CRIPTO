@@ -8,6 +8,13 @@
 #define CLI_H
 
 /**
+ * @brief Maximum amount of options supported by the CLI parser. This can be configured as needed,
+ *        but the larger the number, the more memory the CLI parser consumes. Also, using a very
+ *        high number can cause stack overflows.
+ */
+#define MAX_OPTIONS 32
+
+/**
  * @brief Maximum length for a short option name (including null terminator).
  */
 #define CLI_MAX_SHORT_OPTION_NAME 4

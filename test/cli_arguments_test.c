@@ -322,6 +322,69 @@ static void test_missing_required_and_invalid_values_mistakes() {
     }
 }
 
+static void test_picture_bitmap_extension_validation() {
+    // 1. Valid .bmp extensions (both -p and --picture, case-insensitivity, paths)
+    {
+        const char *valid_cases[] = {
+            "image.bmp",
+            "image.BMP",
+            "image.Bmp",
+            "/path/to/nested/carrier.bmp",
+            "some.dir/another.dir/carrier.BMP",
+            "archive.backup.bmp"
+        };
+        for (size_t i = 0; i < sizeof(valid_cases) / sizeof(valid_cases[0]); i++) {
+            const char *argv[] = {
+                "stegobmp", "-embed", "-in", "msg.txt", "-p", valid_cases[i],
+                "-out", "out.bmp", "-steg", "LSB1"
+            };
+            cli c = parse_command_line(ARRAY_LEN(argv), argv);
+            ASSERT_MSG(c != nullptr, "Valid bitmap picture extension should succeed");
+            if (c) cli_destroy(c);
+        }
+    }
+
+    // 2. Invalid picture extensions (should fail validation)
+    {
+        const char *invalid_cases[] = {
+            "image.png",
+            "image.jpg",
+            "image.jpeg",
+            "image.txt",
+            "image.pdf",
+            "image.gif",
+            "carrier_no_ext",
+            "/path/to/carrier_no_ext",
+            "dir.bmp/carrier_no_ext",
+            "carrier.bmp.txt",
+            "carrier.bmp.bak",
+            "carrier."
+        };
+        for (size_t i = 0; i < sizeof(invalid_cases) / sizeof(invalid_cases[0]); i++) {
+            // Test with short option -p
+            {
+                const char *argv[] = {
+                    "stegobmp", "-embed", "-in", "msg.txt", "-p", invalid_cases[i],
+                    "-out", "out.bmp", "-steg", "LSB1"
+                };
+                cli c = parse_command_line(ARRAY_LEN(argv), argv);
+                ASSERT_MSG(c == nullptr, "Picture without .bmp extension should fail validation");
+                if (c) cli_destroy(c);
+            }
+            // Test with long option --picture in extract mode as well
+            {
+                const char *argv[] = {
+                    "stegobmp", "-extract", "--picture", invalid_cases[i],
+                    "-out", "out.txt", "-steg", "LSB1"
+                };
+                cli c = parse_command_line(ARRAY_LEN(argv), argv);
+                ASSERT_MSG(c == nullptr, "Picture without .bmp extension should fail validation in extract mode");
+                if (c) cli_destroy(c);
+            }
+        }
+    }
+}
+
 int main() {
     // Redirect stderr to /dev/null during expected-failure tests to keep test output clean
     FILE *orig_stderr = stderr;
@@ -337,6 +400,7 @@ int main() {
     test_mode_and_in_parameter_mistakes();
     test_encryption_without_password_mistakes();
     test_missing_required_and_invalid_values_mistakes();
+    test_picture_bitmap_extension_validation();
 
     if (null_out) {
         stderr = orig_stderr;
