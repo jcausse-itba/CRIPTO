@@ -27,15 +27,15 @@ bool str_equals(const char * a, const char * b, bool case_insensitive) {
     return case_insensitive ? str_case_equals(a, b) : strcmp(a, b) == 0;
 }
 
-void get_file_extension(const char * restrict filename, bool lowercase, char * const out_extension, size_t max_size) {
+bool get_file_extension(const char * restrict filename, bool lowercase, char * const out_extension, size_t max_size) {
     if (out_extension == nullptr || max_size == 0) {
-        return;
+        return false;               // Parameter error
     }
 
     out_extension[0] = '\0';
 
     if (filename == nullptr) {
-        return;
+        return false;               // Parameter error
     }
 
     // Find last directory separator. Can be / for UNIX-like systems, or \ for Windows systems.
@@ -57,13 +57,13 @@ void get_file_extension(const char * restrict filename, bool lowercase, char * c
     const char *basename = (sep != nullptr) ? sep + 1 : filename;
 
     if (strcmp(basename, ".") == 0 || strcmp(basename, "..") == 0) {
-        return;
+        return false;               // Not a file
     }
 
     // Find file extension
     const char *dot = strrchr(basename, '.');
     if (dot == nullptr) {
-        return;
+        return false;               // File has no extension
     }
 
     // Copy file extension to output buffer
@@ -73,4 +73,5 @@ void get_file_extension(const char * restrict filename, bool lowercase, char * c
         i++;
     }
     out_extension[i] = '\0';
+    return true;                    // Success
 }

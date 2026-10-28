@@ -23,15 +23,21 @@ bool str_equals(const char * a, const char * b, bool case_insensitive);
 /**
  * @brief       Get a file's extension.
  * @details     File extensions are returned with the starting dot. E.g. for a file
- *              named "my_spectacular_file.pdf.txt", ".txt" is returned, as it
+ *              named `"my_spectacular_file.pdf.txt"`, `".txt"` is returned, as it
  *              corresponds to the real extension (substring after last dot).
- * @param[in]   filename        The filename to process.
+ *              If `filename` is a relative or absolute path to the file, only the part
+ *              after the last directory separator (`/` for UNIX, `\` for Windows) is taken
+ *              into consideration.
+ *              On failure, this function writes a null-terminating byte to the output buffer.
+ * @param[in]   filename        The filename to process. Must be not null.
  * @param[in]   lowercase       When set to `true`, output will be converted to lowercase.
  * @param[out]  out_extension   A pointer to a large enough memory location to write
- *                              the extension.
+ *                              the extension. Must be not null.
  * @param[in]   max_size        Maximum amount of bytes to be written at `out_extension`,
- *                              including the null-terminating byte '\0'.
+ *                              including the null-terminating byte `'\0'`. Must be > 0.
+ * @return      `true` on success retrieving the extension. `false` if no extension was found,
+ *              or on parameter errors.
  */
-void get_file_extension(const char * restrict filename, bool lowercase, char * const out_extension, size_t max_size);
+bool get_file_extension(const char * restrict filename, bool lowercase, char * const out_extension, size_t max_size);
 
 #endif // _STRING_UTILS_H_
