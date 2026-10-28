@@ -89,7 +89,7 @@ def main() -> None:
         return
 
     full_path = BASE_PATH / filename
-    print(f'\nSelected file: {full_path}\n')
+    print(f'\nSelected file: {full_path}')
 
     result = read_binary(full_path, HEADER_SIZE_BYTES)
     if not result:
@@ -103,7 +103,27 @@ def main() -> None:
     is_valid_sig = file_header.file_type == TARGET_SIGNATURE
     sig_status = "OK" if is_valid_sig else "ERROR (Expected 'BM' / 0x4d42)"
 
-    if input('Show headers? (y/n): ').lower() in ['y', 'yes']:
+    # Validation checks
+    errors = []
+
+    if info_header.size != 40:
+        errors.append(f"Not BMP V3 (header size is {info_header.size}, expected 40)")
+
+    if info_header.bits_per_pixel != 24:
+        errors.append(f"Not 24 bpp (found {info_header.bits_per_pixel} bpp)")
+
+    if info_header.compression != 0:
+        errors.append(f"Image is compressed (compression method is {info_header.compression}, expected 0/BI_RGB)")
+
+    if not errors:
+        print("\nThis file is OK")
+    else:
+        print("\nValidation failed:")
+        for err in errors:
+            print(f"  - {err}")
+
+    # Verbose output
+    if not errors and input('Show headers? (y/n): ').lower() in ['y', 'yes']:
         print("=" * 45)
         print("           BMP FILE HEADER (14 bytes)        ")
         print("=" * 45)
@@ -129,26 +149,6 @@ def main() -> None:
         print(f"  colors_used      : {info_header.colors_used}")
         print(f"  colors_important : {info_header.colors_important}")
         print("=" * 45)
-
-
-    # Validation checks
-    errors = []
-
-    if info_header.size != 40:
-        errors.append(f"Not BMP V3 (header size is {info_header.size}, expected 40)")
-
-    if info_header.bits_per_pixel != 24:
-        errors.append(f"Not 24 bpp (found {info_header.bits_per_pixel} bpp)")
-
-    if info_header.compression != 0:
-        errors.append(f"Image is compressed (compression method is {info_header.compression}, expected 0/BI_RGB)")
-
-    if not errors:
-        print("\nThis file is OK")
-    else:
-        print("\nValidation failed:")
-        for err in errors:
-            print(f"  - {err}")
 
 
 if __name__ == '__main__':
