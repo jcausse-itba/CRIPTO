@@ -3,8 +3,11 @@ BUILD_DIR ?= build
 
 CMAKE ?= cmake
 CTEST ?= ctest
+PYTHON := $(shell command -v python3 || command -v python)
 
-.PHONY: dev release test clean help
+
+.PHONY: dev release test clean check-python inspect help
+
 
 dev: ## Build a development executable that bundles Lib ASan
 	@$(CMAKE) -B $(BUILD_DIR) -S . -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=ON
@@ -25,6 +28,15 @@ clean: ## Clean temporary build files
 	@rm -rf $(BUILD_DIR) stegobmp *.o
 	@rm -rf ./cmake-build-debug
 	@$(MAKE) -C test clean > /dev/null 2>&1 || true
+
+check-python:
+	@if [ -z "$(PYTHON)" ]; then \
+		echo "Error: Neither 'python3' nor 'python' was found in your PATH."; \
+		exit 1; \
+	fi
+
+inspect: check-python ## Inspect a BMP image to determine whether it's OK to use with stegobmp (BMP v3) or not
+	@$(PYTHON) external-utilities/bmp_inspector.py
 
 help: ## Show this help message
 	@echo "Usage: make [target]"

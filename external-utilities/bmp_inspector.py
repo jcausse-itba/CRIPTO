@@ -130,5 +130,25 @@ def main() -> None:
     print("=" * 45)
 
 
+    # Validation checks
+    errors = []
+
+    if info_header.size != 40:
+        errors.append(f"Not BMP V3 (header size is {info_header.size}, expected 40)")
+
+    if info_header.bits_per_pixel != 24:
+        errors.append(f"Not 24 bpp (found {info_header.bits_per_pixel} bpp)")
+
+    if info_header.compression != 0:
+        errors.append(f"Image is compressed (compression method is {info_header.compression}, expected 0/BI_RGB)")
+
+    if not errors:
+        print("\nThis file is OK")
+    else:
+        print("\nValidation failed:")
+        for err in errors:
+            print(f"  - {err}")
+
+
 if __name__ == '__main__':
     main()
