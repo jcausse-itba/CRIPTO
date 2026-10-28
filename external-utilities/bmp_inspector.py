@@ -103,31 +103,32 @@ def main() -> None:
     is_valid_sig = file_header.file_type == TARGET_SIGNATURE
     sig_status = "OK" if is_valid_sig else "ERROR (Expected 'BM' / 0x4d42)"
 
-    print("=" * 45)
-    print("           BMP FILE HEADER (14 bytes)        ")
-    print("=" * 45)
-    print(f"  file_type        : {file_header.file_type:#06x} ('{magic_ascii}') [{sig_status}]")
-    print(f"  file_size        : {file_header.file_size:,} bytes")
-    print(f"  reserved1        : {file_header.reserved1}")
-    print(f"  reserved2        : {file_header.reserved2}")
-    print(f"  bitmap_offset    : {file_header.bitmap_offset} (0x{file_header.bitmap_offset:X})")
+    if input('Show headers? (y/n): ').lower() in ['y', 'yes']:
+        print("=" * 45)
+        print("           BMP FILE HEADER (14 bytes)        ")
+        print("=" * 45)
+        print(f"  file_type        : {file_header.file_type:#06x} ('{magic_ascii}') [{sig_status}]")
+        print(f"  file_size        : {file_header.file_size:,} bytes")
+        print(f"  reserved1        : {file_header.reserved1}")
+        print(f"  reserved2        : {file_header.reserved2}")
+        print(f"  bitmap_offset    : {file_header.bitmap_offset} (0x{file_header.bitmap_offset:X})")
 
-    # --- DIB Info Header (40 bytes / BITMAPINFOHEADER) ---
-    print("\n" + "=" * 45)
-    print("      BITMAP INFO HEADER (40 bytes / V3)     ")
-    print("=" * 45)
-    print(f"  size (header)    : {info_header.size} bytes")
-    print(f"  width            : {info_header.width} px")
-    print(f"  height           : {info_header.height} px {'(bottom-up)' if info_header.height > 0 else '(top-down)'}")
-    print(f"  planes           : {info_header.planes}")
-    print(f"  bits_per_pixel   : {info_header.bits_per_pixel} bpp")
-    print(f"  compression      : {info_header.compression} ({'BI_RGB uncompressed' if info_header.compression == 0 else 'compressed'})")
-    print(f"  size_of_bitmap   : {info_header.size_of_bitmap:,} bytes")
-    print(f"  horz_resolution  : {info_header.horz_resolution} px/m")
-    print(f"  vert_resolution  : {info_header.vert_resolution} px/m")
-    print(f"  colors_used      : {info_header.colors_used}")
-    print(f"  colors_important : {info_header.colors_important}")
-    print("=" * 45)
+        # --- DIB Info Header (40 bytes / BITMAPINFOHEADER) ---
+        print("\n" + "=" * 45)
+        print("      BITMAP INFO HEADER (40 bytes / V3)     ")
+        print("=" * 45)
+        print(f"  size (header)    : {info_header.size} bytes")
+        print(f"  width            : {info_header.width} px")
+        print(f"  height           : {info_header.height} px {'(bottom-up)' if info_header.height > 0 else '(top-down)'}")
+        print(f"  planes           : {info_header.planes}")
+        print(f"  bits_per_pixel   : {info_header.bits_per_pixel} bpp")
+        print(f"  compression      : {info_header.compression} ({'BI_RGB uncompressed' if info_header.compression == 0 else 'compressed'})")
+        print(f"  size_of_bitmap   : {info_header.size_of_bitmap:,} bytes")
+        print(f"  horz_resolution  : {info_header.horz_resolution} px/m")
+        print(f"  vert_resolution  : {info_header.vert_resolution} px/m")
+        print(f"  colors_used      : {info_header.colors_used}")
+        print(f"  colors_important : {info_header.colors_important}")
+        print("=" * 45)
 
 
     # Validation checks
