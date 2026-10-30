@@ -112,7 +112,7 @@ static const multi_argument_validation_t MULTI_ARG_VALIDATIONS[] = {
     },
     {
         .fun = bitmap_file_should_have_bmp_extension,
-        .msg = "Parameter '" CLI_OPT_PICTURE_LONG "' ('" CLI_OPT_PICTURE_SHORT "') must be a valid filename with extension '" PICTURE_FILE_EXTENSION "'"
+        .msg = "Parameter '" CLI_OPT_PICTURE_LONG "' ('" CLI_OPT_PICTURE_SHORT "') must be a valid filename with extension '" PICTURE_FILE_EXTENSION "'."
     }
 };
 
