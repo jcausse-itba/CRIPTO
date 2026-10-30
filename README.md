@@ -30,6 +30,10 @@
 
 ## Instrucciones de Compilación
 
+> **Nota:**
+> 
+> Puede ver el detalle completo de las opciones disponibles en el `Makefile` ejecutando `make`.
+
 Debe contar con:
 - `GCC` (versión 14 o superior con soporte para C23).
 - `make`.
@@ -45,12 +49,6 @@ sudo apt update -y && sudo apt install -y gcc make cmake openssl libssl-dev buil
 ```
 
 </details>
-
-<br>
-
-> **Nota:**
-> 
-> Puede ver el detalle completo de las opciones disponibles en el `Makefile` ejecutando `make`.
 
 ### Compilación para Entrega (Release)
 Genera el ejecutable optimizado sin AddressSanitizer (ASan) ni sanitizers para reducir el consumo de memoria y maximizar el rendimiento:

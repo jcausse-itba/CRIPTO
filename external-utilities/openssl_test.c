@@ -2,6 +2,12 @@
 #include <string.h>
 #include <openssl/evp.h>
 
+/*
+gcc -Wall -Wextra -Werror -pedantic -std=c23 -Iinclude external-utilities/openssl_test.c -o openssl_test -lssl -lcrypto &&
+./openssl_test &&
+rm openssl_test
+*/
+
 int main() {
     const char *message = "Hello, OpenSSL!";
     unsigned char hash[EVP_MAX_MD_SIZE];

@@ -3,9 +3,11 @@
 #include <assert.h>
 #include "bitmap_v3.h"
 
-// gcc -Wall -Wextra -Werror -pedantic -std=c23 -Iinclude external-utilities/bitmap_headers_test.c -o bitmap_headers_test
-// ./bitmap_headers_test
-// rm bitmap_headers_test
+/*
+gcc -Wall -Wextra -Werror -pedantic -std=c23 -Iinclude external-utilities/bitmap_headers_test.c -o bitmap_headers_test &&
+./bitmap_headers_test &&
+rm bitmap_headers_test
+*/
 
 int main() {
     printf("BITMAPFILEHEADER size: %lu\n", sizeof(BITMAPFILEHEADER));
