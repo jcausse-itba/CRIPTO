@@ -4,6 +4,9 @@
 #include "cli_arguments.h"
 #include "string_utils.h"
 #include "io_utils.h"
+#include "logger.h"
+
+extern Logger logger;
 
 // --------------------------------------------------------------------------------------------------
 
@@ -147,7 +150,7 @@ cli parse_command_line(int argc, const char * argv[]) {
         cli_error_code error_code = cli_get_error(c, &error_option);
         
         if (error_option){
-            show_error(
+            LOG_ERROR(
                 "Error:\n\t- %s\n\t- On parameter: %s\n\n%s\n", 
                 err_desc(error_code),
                 error_option,
@@ -155,7 +158,7 @@ cli parse_command_line(int argc, const char * argv[]) {
             );
         }
         else {
-            show_error(
+            LOG_ERROR(
                 "Error:\n\t- %s\n\n%s\n", 
                 err_desc(error_code),
                 cli_usage(c, argv[0])
@@ -170,7 +173,7 @@ cli parse_command_line(int argc, const char * argv[]) {
     size_t count = sizeof(MULTI_ARG_VALIDATIONS) / sizeof(multi_argument_validation_t);
     for (size_t i = 0; i < count; i++) {
         if (! MULTI_ARG_VALIDATIONS[i].fun(c)) {
-            show_error(
+            LOG_ERROR(
                 "Error:\n\t- %s\n\n%s\n", 
                 MULTI_ARG_VALIDATIONS[i].msg,
                 cli_usage(c, argv[0])

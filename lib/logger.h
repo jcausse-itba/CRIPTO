@@ -18,13 +18,7 @@
 #ifndef __LOGGER_H__
 #define __LOGGER_H__
 
-#include <stdio.h>      // FILE, vfprintf()
-#include <stdlib.h>     // malloc(), free()
-#include <stdbool.h>    // bool, true, false
-#include <stdarg.h>     // va_list, va_start(), va_end()
-#include <unistd.h>     // close()
-#include <errno.h>      // errno
-#include <time.h>       // time_t, time(), localtime(), strftime()
+#include <stdio.h>      // FILE
 
 /****************************************************************************************/
 /* CUSTOMIZABLE                                                                         */
@@ -115,7 +109,7 @@ typedef struct {
  * @param[in] config        Logger configuration.
  * @param[in] stream        The stream where to write the logs (typically `stderr`).
  * 
- * @return          A Logger on success, nullptr on failure. On error, errno is set accordingly.
+ * @return          A Logger on success, nullptr on failure.
  */
 Logger Logger_create_from_stream(LoggerConfig config, FILE * const stream);
 
@@ -125,9 +119,9 @@ Logger Logger_create_from_stream(LoggerConfig config, FILE * const stream);
  * @param[in] config        Logger configuration.
  * @param[in] file_path     The path to the file where the logs will be saved.
  * 
- * @return          A Logger on success, nullptr on failure. On error, errno is set accordingly.
+ * @return          A Logger on success, nullptr on failure.
  */
-Logger Logger_create_from_path(LoggerConfig config, const char * const file_path);
+Logger Logger_create_from_path(LoggerConfig config, const char * restrict file_path);
 
 /**
  * @brief           Log a message to the Logger.
@@ -148,6 +142,6 @@ bool Logger_log(Logger const self, LogLevels level, const char * __restrict__ fm
  * 
  * @param[in] self          The Logger itself.
  */
-void Logger_cleanup(Logger const self);
+void Logger_destroy(Logger const self);
 
 #endif // __LOGGER_H__

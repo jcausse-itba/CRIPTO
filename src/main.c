@@ -2,6 +2,17 @@
 #include <stdlib.h>
 #include "cli_arguments.h"
 #include "io_utils.h"
+#include "logger.h"
+
+Logger logger = nullptr;              // Global Logger instance is defined here
+
+static LoggerConfig logger_config = {
+    .min_log_level = LOGGER_LEVEL_INFO,
+    .with_level = true,
+    .with_datetime = false,
+    .flush_immediately = false,
+    .log_prefix = nullptr
+};
 
 static bool bitmap_file_exists(cli c) {
     const char * picture_filename = nullptr;
@@ -9,7 +20,7 @@ static bool bitmap_file_exists(cli c) {
     if (!cli_get_string(c, CLI_OPT_PICTURE_LONG, &picture_filename)) return false;
 
     if (!file_exists(picture_filename)){
-        show_error("\nError:\n\t- File not found: %s\n", picture_filename);
+        LOG_ERROR("\nError:\n\t- File not found: %s\n", picture_filename);
         return false;
     }
     return true;
@@ -27,7 +38,7 @@ static bool in_file_exists(cli c) {
     if (!cli_get_string(c, CLI_OPT_IN_LONG, &in_filename)) return false;
 
     if (!file_exists(in_filename)) {
-        show_error("\nError:\n\t- File not found: %s\n", in_filename);
+        LOG_ERROR("\nError:\n\t- File not found: %s\n", in_filename);
         return false;
     }
     return true;
@@ -36,8 +47,10 @@ static bool in_file_exists(cli c) {
 int main(int argc, const char * argv[]) {
     int exit_status = EXIT_FAILURE;
 
-    // Things that need cleanup
     cli c = nullptr;
+
+    // Initialize the global Logger instance that will be used across all modules
+    if(!(logger = Logger_create_from_stream(logger_config, stdout))) goto cleanup;
     
     // Parse command line arguments and show configuration
     if (!(c = parse_command_line(argc, argv))) goto cleanup;
@@ -56,6 +69,7 @@ int main(int argc, const char * argv[]) {
     exit_status = EXIT_SUCCESS;
 
 cleanup:
+    if (logger) Logger_destroy(logger);
     if (c) cli_destroy(c);
 
     return exit_status;

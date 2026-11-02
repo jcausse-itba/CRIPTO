@@ -1,4 +1,7 @@
 #include "logger.h"
+#include <stdlib.h>     // malloc(), free()
+#include <stdarg.h>     // va_list, va_start(), va_end()
+#include <time.h>       // time_t, time(), localtime(), strftime()
 
 typedef struct _Logger_t {
     LogLevels       min_level;
@@ -6,7 +9,10 @@ typedef struct _Logger_t {
     bool            with_level;
     bool            flush_immediately;
     const char *    log_prefix;
+
+    /* File or Stream to write the logs */
     FILE *          log_file;
+    bool            should_close;
 } _Logger_t;
 
 static const char * LogLevelsStr[] = {
@@ -33,9 +39,7 @@ static void get_current_datetime(char * buff, size_t size){
     strftime(buff, size, DATETIME_FORMAT, timeinfo);
 }
 
-static Logger Logger_create_common(LoggerConfig config, FILE * log_file){
-    errno = 0;
-
+static Logger Logger_create_common(LoggerConfig config, FILE * log_file, bool should_close){
     Logger self = malloc(sizeof(_Logger_t));
     if (!self) return nullptr;
 
@@ -46,20 +50,21 @@ static Logger Logger_create_common(LoggerConfig config, FILE * log_file){
     self->flush_immediately = config.flush_immediately;
     self->log_prefix        = config.log_prefix;
     self->log_file          = log_file;
+    self->should_close      = should_close;
 
     /* Success */
     return self;
 }
 
 Logger Logger_create_from_stream(LoggerConfig config, FILE * const stream) {
-    return Logger_create_common(config, stream);
+    return Logger_create_common(config, stream, false);
 }
 
-Logger Logger_create_from_path(LoggerConfig config, const char * const file_path) {
+Logger Logger_create_from_path(LoggerConfig config, const char * restrict file_path) {
     FILE * log_file = fopen(file_path, "a");
     if (!log_file) return nullptr;
 
-    Logger self = Logger_create_common(config, log_file);
+    Logger self = Logger_create_common(config, log_file, true);
     if (!self) {
         fclose(log_file);
         return nullptr;
@@ -68,7 +73,7 @@ Logger Logger_create_from_path(LoggerConfig config, const char * const file_path
     return self;
 }
 
-bool Logger_log(Logger const self, LogLevels level, const char * __restrict__ fmt, ...){
+bool Logger_log(Logger const self, LogLevels level, const char * restrict fmt, ...){
     if (self == nullptr || level < 0 || level >= LOG_LEVELS_QTY || level < self->min_level || fmt == nullptr){
         return false;
     }
@@ -117,13 +122,13 @@ bool Logger_log(Logger const self, LogLevels level, const char * __restrict__ fm
     return true;
 }
 
-void Logger_cleanup(Logger const self){
+void Logger_destroy(Logger const self){
     if (self == nullptr){
         return;
     }
     if (self->log_file != nullptr){
         fflush(self->log_file);
-        fclose(self->log_file);
+        if (self->should_close) fclose(self->log_file);
     }
     free(self);
 }
