@@ -1,7 +1,16 @@
 #include "cli_arguments.h"
 #include "custom_assert.h"
+#include "logger.h"
 #include <string.h>
 #include <stdio.h>
+
+/**
+ * cli_arguments.c has a dependency on the Logger that is declared as extern.
+ * Setting the logger instance as nullptr will cause Logger_log to return false
+ * and tests just won't log, so the Logger is bypassed. This allows for the
+ * cli_arguments.c implementation to be tested without depending on the Logger.
+ */
+Logger logger = nullptr;
 
 #define ARRAY_LEN(arr) ((int)(sizeof(arr) / sizeof((arr)[0])))
 
@@ -386,13 +395,6 @@ static void test_picture_bitmap_extension_validation() {
 }
 
 int main() {
-    // Redirect stderr to /dev/null during expected-failure tests to keep test output clean
-    FILE *orig_stderr = stderr;
-    FILE *null_out = fopen("/dev/null", "w");
-    if (null_out) {
-        stderr = null_out;
-    }
-
     test_embed_full_encryption_example_1();
     test_embed_no_encryption_example_2();
     test_embed_encryption_defaults_combinations();
@@ -401,11 +403,6 @@ int main() {
     test_encryption_without_password_mistakes();
     test_missing_required_and_invalid_values_mistakes();
     test_picture_bitmap_extension_validation();
-
-    if (null_out) {
-        stderr = orig_stderr;
-        fclose(null_out);
-    }
 
     return ASSERT_REPORT();
 }
