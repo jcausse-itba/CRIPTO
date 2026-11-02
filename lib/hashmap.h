@@ -2,6 +2,7 @@
  * @file        hashmap.h
  * @brief       Implementation of a HashMap.
  * @date        May, 2024.
+ * @author      Causse, Juan Ignacio (jcausse@itba.edu.ar)
 */
 
 #ifndef __HASHMAP_H__
