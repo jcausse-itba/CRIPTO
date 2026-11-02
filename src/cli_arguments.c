@@ -186,11 +186,23 @@ cli parse_command_line(int argc, const char * argv[]) {
     return c;
 }
 
+#define CONFIG_BUFFER_SIZE 4096
+
 void print_config(cli c) {
     if (!c) return;
 
+    char buffer[CONFIG_BUFFER_SIZE] = {0};
+    size_t offset = 0;
+
+    int written = snprintf(buffer + offset, sizeof(buffer) - offset, "Configuration:\n");
+    if (written > 0) {
+        offset += (size_t)written;
+        if (offset >= sizeof(buffer)) {
+            offset = sizeof(buffer) - 1;
+        }
+    }
+
     size_t size = sizeof(COMMAND_LINE_OPTIONS) / sizeof(COMMAND_LINE_OPTIONS[0]);
-    printf("Configuration:\n");
 
     for (size_t i = 0; i < size; i++) {
         const cli_option * opt = &COMMAND_LINE_OPTIONS[i];
@@ -198,26 +210,26 @@ void print_config(cli c) {
         bool is_set = false;
         cli_is_set(c, name, &is_set);
 
-        printf("  - %-18s : ", name);
+        char val_str[512] = "";
         switch (opt->type) {
             case CLI_TYPE_FLAG: {
                 bool val = false;
                 if (cli_get_flag(c, name, &val)) {
-                    printf("%s", val ? "true" : "false");
+                    snprintf(val_str, sizeof(val_str), "%s", val ? "true" : "false");
                 }
                 break;
             }
             case CLI_TYPE_INTEGER: {
                 long val = 0;
                 if (cli_get_integer(c, name, &val)) {
-                    printf("%ld", val);
+                    snprintf(val_str, sizeof(val_str), "%ld", val);
                 }
                 break;
             }
             case CLI_TYPE_FLOAT: {
                 double val = 0.0;
                 if (cli_get_float(c, name, &val)) {
-                    printf("%f", val);
+                    snprintf(val_str, sizeof(val_str), "%f", val);
                 }
                 break;
             }
@@ -226,13 +238,26 @@ void print_config(cli c) {
             case CLI_TYPE_CHOICE: {
                 const char * val = nullptr;
                 if (cli_get_string(c, name, &val)) {
-                    printf("\"%s\"", val ? val : "(null)");
+                    snprintf(val_str, sizeof(val_str), "\"%s\"", val ? val : "(null)");
                 }
                 break;
             }
         }
-        printf(" (%s)\n", is_set ? "set" : "default");
+
+        if (offset < sizeof(buffer) - 1) {
+            written = snprintf(buffer + offset, sizeof(buffer) - offset,
+                               "  - %-18s : %s (%s)\n",
+                               name, val_str, is_set ? "set" : "default");
+            if (written > 0) {
+                offset += (size_t)written;
+                if (offset >= sizeof(buffer)) {
+                    offset = sizeof(buffer) - 1;
+                }
+            }
+        }
     }
+
+    LOG_INFO("%s", buffer);
 }
 
 bool verbose(cli c) {
