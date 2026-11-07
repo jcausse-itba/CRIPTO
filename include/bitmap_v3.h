@@ -20,7 +20,7 @@ typedef int32_t     LONG;
 // We use __attribute__((packed)) GCC's flag to prevent compile-time padding on this structure, as it is mapped
 // to a file header.
 typedef struct  __attribute__((packed)) tagBITMAPFILEHEADER {
-    WORD  bfType;               // The file type; must be 0x4d42 (the ASCII string "BM").
+    WORD  bfType;               // The file type; must be 0x4D42 (the ASCII string "BM").
     DWORD bfSize;               // The size, in bytes, of the bitmap file.
     WORD  bfReserved1;          // Reserved; must be zero.
     WORD  bfReserved2;          // Reserved; must be zero.
