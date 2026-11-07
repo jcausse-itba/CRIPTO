@@ -21,14 +21,14 @@ static bool bitmap_file_exists(cli c) {
 
     if (!cli_get_string(c, CLI_OPT_PICTURE_LONG, &picture_filename)) return false;
 
-    if (!file_exists(picture_filename)){
+    if (!get_file_size(picture_filename, nullptr)){
         LOG_ERROR("\nError:\n\t- File not found: %s\n", picture_filename);
         return false;
     }
     return true;
 }
 
-static bool in_file_exists(cli c) {
+static bool in_file_exists(cli c, size_t * out_size) {
     bool embed_set = false;                     // in is only defined when embed is set
     const char * in_filename = nullptr;
 
@@ -39,7 +39,7 @@ static bool in_file_exists(cli c) {
 
     if (!cli_get_string(c, CLI_OPT_IN_LONG, &in_filename)) return false;
 
-    if (!file_exists(in_filename)) {
+    if (!get_file_size(in_filename, out_size)) {
         LOG_ERROR("\nError:\n\t- File not found: %s\n", in_filename);
         return false;
     }
@@ -60,8 +60,9 @@ int main(int argc, const char * argv[]) {
     if (verbose) print_config(c);                                                       // Uses logger
 
     // Check files existence
+    size_t in_file_size = 0;                                                            // Only used for -embed
     bool bitmap_file_ok = bitmap_file_exists(c);                                        // Logs errors
-    bool in_file_ok = in_file_exists(c);                                                // Logs errors
+    bool in_file_ok = in_file_exists(c, &in_file_size);                                 // Logs errors
     if (!bitmap_file_ok || !in_file_ok) goto cleanup;
 
     // Run the selected task
@@ -70,7 +71,9 @@ int main(int argc, const char * argv[]) {
         LOG_ERROR("Error getting option: %s", CLI_OPT_EMBED_LONG);
         goto cleanup;
     }
-    exit_status = is_embed ? embed_main(c, verbose) : extract_main(c, verbose);         // Logs errors
+    exit_status = is_embed 
+        ? embed_main(c, verbose, in_file_size)                                          // Logs errors
+        : extract_main(c, verbose);                                                     // Logs errors
 
 cleanup:
     if (logger) Logger_destroy(logger);
