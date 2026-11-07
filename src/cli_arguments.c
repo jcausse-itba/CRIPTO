@@ -260,7 +260,7 @@ void print_config(cli c) {
     LOG_INFO("%s", buffer);
 }
 
-bool verbose(cli c) {
+bool is_verbose_set(cli c) {
     bool val = false, res = cli_is_set(c, CLI_OPT_VERBOSE_LONG, &val);
     return val && res;
 }

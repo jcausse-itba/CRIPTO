@@ -3,6 +3,8 @@
 #include "cli_arguments.h"
 #include "io_utils.h"
 #include "logger.h"
+#include "embed.h"
+#include "extract.h"
 
 Logger logger = nullptr;              // Global Logger instance is defined here
 
@@ -53,20 +55,22 @@ int main(int argc, const char * argv[]) {
     if(!(logger = Logger_create_from_stream(logger_config, stdout))) goto cleanup;
     
     // Parse command line arguments and show configuration
-    if (!(c = parse_command_line(argc, argv))) goto cleanup;
-    if (verbose(c)) print_config(c);
+    if (!(c = parse_command_line(argc, argv))) goto cleanup;                            // Logs errors
+    bool verbose = is_verbose_set(c);
+    if (verbose) print_config(c);                                                       // Uses logger
 
     // Check files existence
-    bool bitmap_file_ok = bitmap_file_exists(c);
-    bool in_file_ok = in_file_exists(c);
+    bool bitmap_file_ok = bitmap_file_exists(c);                                        // Logs errors
+    bool in_file_ok = in_file_exists(c);                                                // Logs errors
     if (!bitmap_file_ok || !in_file_ok) goto cleanup;
 
-
-    // Do something
-
-
-    // Set exit status, cleanup and exit gracefully
-    exit_status = EXIT_SUCCESS;
+    // Run the selected task
+    bool is_embed = false;
+    if (!cli_get_flag(c, CLI_OPT_EMBED_LONG, &is_embed)){
+        LOG_ERROR("Error getting option: %s", CLI_OPT_EMBED_LONG);
+        goto cleanup;
+    }
+    exit_status = is_embed ? embed_main(c, verbose) : extract_main(c, verbose);         // Logs errors
 
 cleanup:
     if (logger) Logger_destroy(logger);

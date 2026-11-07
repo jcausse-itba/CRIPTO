@@ -120,6 +120,6 @@ static const cli_option COMMAND_LINE_OPTIONS[] = {
 
 cli parse_command_line(int argc, const char * argv[]);
 void print_config(cli c);
-bool verbose(cli c);
+bool is_verbose_set(cli c);
 
 #endif // _CLI_ARGUMENTS_H_
