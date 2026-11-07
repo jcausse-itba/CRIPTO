@@ -1,6 +1,8 @@
 #ifndef _IO_UTILS_H_
 #define _IO_UTILS_H_
 
+#include <stddef.h>
+
 /**
  * @brief       Check if a file exists and can be opened. If so, get its size in bytes.
  *              Passing `nullptr` to `out_size` parameter skips file size calculation.

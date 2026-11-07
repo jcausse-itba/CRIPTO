@@ -16,7 +16,7 @@ bool get_file_size(const char * restrict filename, size_t * out_size) {
             return false;
         }
         // Calculate the size using the current pointer of the stream
-        *out_size = ftell(fseek);
+        *out_size = ftell(file);
     }
 
     fclose(file);
