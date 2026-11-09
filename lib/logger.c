@@ -53,7 +53,7 @@ static bool stream_is_tty(FILE * stream) {
 #define ANSI_RESET   "\033[0m"
 #define ANSI_CYAN    "\033[36m"
 #define ANSI_GREEN   "\033[32m"
-#define ANSI_YELLOW  "\033[33m"
+#define ANSI_YELLOW  "\033[33;1m"
 #define ANSI_RED     "\033[31;1m"
 
 static const char * LogLevelColors[LOG_LEVELS_QTY] = {
