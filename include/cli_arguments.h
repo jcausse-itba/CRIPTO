@@ -2,6 +2,7 @@
 #define _CLI_ARGUMENTS_H_
 
 #include "cli.h"
+#include "cryptography.h"
 
 #define PICTURE_FILE_EXTENSION ".bmp"
 
@@ -28,22 +29,16 @@ static const char * STEGANOGRAPHY_CHOICES[] = {
     nullptr
 };
 
-static constexpr char DEFAULT_CIPHER[] = "AES128";
 static const char * CIPHER_CHOICES[] = {
-    DEFAULT_CIPHER,
-    "AES192",
-    "AES256",
-    "3DES",
-    nullptr
+    #define XX(_identifier, _string) _string,
+    CIPHER_ALGORITHMS(XX)
+    #undef XX
 };
 
-static constexpr char DEFAULT_MODE[] = "CBC";
 static const char * MODE_CHOICES[] = {
-    "ECB",
-    "CFB",
-    "OFB",
-    DEFAULT_MODE,
-    nullptr
+    #define XX(_identifier, _string) _string,
+    CIPHER_MODES(XX)
+    #undef XX
 };
 
 static const cli_option COMMAND_LINE_OPTIONS[] = {
@@ -91,7 +86,7 @@ static const cli_option COMMAND_LINE_OPTIONS[] = {
         .option_name_long = CLI_OPT_CIPHER_ALG_LONG,
         .type = CLI_TYPE_CHOICE,
         .required = false,
-        .default_value = {.string_value = DEFAULT_CIPHER},
+        .default_value = {.string_value =  "AES128"},
         .choices = CIPHER_CHOICES,
         .case_insensitive = true,
     },
@@ -100,7 +95,7 @@ static const cli_option COMMAND_LINE_OPTIONS[] = {
         .option_name_long = CLI_OPT_CIPHER_MODE_LONG,
         .type = CLI_TYPE_CHOICE,
         .required = false,
-        .default_value = {.string_value = DEFAULT_MODE},
+        .default_value = {.string_value = "CBC"},
         .choices = MODE_CHOICES,
         .case_insensitive = true
     },
