@@ -58,10 +58,12 @@ typedef struct {
  * @param[in]   mode                Cipher mode to use. Must match one of the
  *                                  CIPHER_MODES strings.
  * 
- * @return      A cipher descriptor. If the `algorithm` or `mode` are `nullptr`, the
- *              descriptor is set to:
- *              - algorithm = CRYPTO_CIPHER_ALGORITHM_NONE
- *              - mode      = CRYPTO_CIPHER_MODE_NONE
+ * @return      A cipher descriptor where `algorithm` and `mode` are independently
+ *              resolved:
+ *              - If `algorithm` is `nullptr` or unrecognized, `algorithm` is set to
+ *                `CRYPTO_CIPHER_ALGORITHM_NONE`.
+ *              - If `mode` is `nullptr` or unrecognized, `mode` is set to
+ *                `CRYPTO_CIPHER_MODE_NONE`.
  */
 crypto_cipher crypto_resolve_cipher(const char * algorithm, const char * mode);
 
