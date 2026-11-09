@@ -40,6 +40,15 @@ static uint8_t * prepare_stego_payload(
         LOG_ERROR("Could not get input file extension for path: \"%s\"", in_filename);
         return nullptr;
     }
+    const char * full_ext = strrchr(in_filename, '.');
+    if (full_ext && strlen(full_ext) >= MAX_FILE_EXTENSION_BUFF) {
+        LOG_WARN(
+            "Input file extension \"%s\" exceeds maximum length (%d chars) and was truncated to \"%s\"",
+            full_ext,
+            MAX_FILE_EXTENSION_BUFF - 1,
+            file_ext_buff
+        );
+    }
     size_t file_ext_len_with_term = strlen(file_ext_buff) + 1;
 
     // Reserve memory for the unencrypted payload
