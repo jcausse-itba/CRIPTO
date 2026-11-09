@@ -187,7 +187,7 @@ static uint8_t * crypto_cipher_transform(
 ) {
     const EVP_CIPHER * cipher = get_cipher_from_descriptor(cipher_descriptor);
 
-    if (!cipher || !password || !in_data || !out_len) return nullptr;
+    if (!cipher || !password || password[0] == '\0' || !in_data || !out_len) return nullptr;
 
     // 1. Derive the symmetric Key and IV from the password
     uint8_t key[EVP_MAX_KEY_LENGTH] = {0};
