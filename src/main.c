@@ -16,36 +16,6 @@ static LoggerConfig logger_config = {
     .log_prefix = nullptr
 };
 
-static bool bitmap_file_exists(cli c) {
-    const char * picture_filename = nullptr;
-
-    if (!cli_get_string(c, CLI_OPT_PICTURE_LONG, &picture_filename)) return false;
-
-    if (!get_file_size(picture_filename, nullptr)){
-        LOG_ERROR("\nError:\n\t- File not found: %s\n", picture_filename);
-        return false;
-    }
-    return true;
-}
-
-static bool in_file_exists(cli c, size_t * out_size) {
-    bool embed_set = false;                     // in is only defined when embed is set
-    const char * in_filename = nullptr;
-
-    if (!cli_is_set(c, CLI_OPT_EMBED_LONG, &embed_set)) return false;
-
-    // If embed is not set, in should not be set, so return true
-    if (!embed_set) return true;
-
-    if (!cli_get_string(c, CLI_OPT_IN_LONG, &in_filename)) return false;
-
-    if (!get_file_size(in_filename, out_size)) {
-        LOG_ERROR("\nError:\n\t- File not found: %s\n", in_filename);
-        return false;
-    }
-    return true;
-}
-
 int main(int argc, const char * argv[]) {
     int exit_status = EXIT_FAILURE;
 
