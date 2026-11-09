@@ -5,12 +5,24 @@
 #include "embed.h"
 #include "cli_arguments.h"
 #include "bitmap.h"
+#include "steganography.h"
 #include "string_utils.h"
 #include "logger.h"
 
 #define MAX_FILE_EXTENSION_BUFF 11
 
 extern Logger logger;
+
+/**
+ * @brief       Write a 32-bit little-endian integer into a 4-byte buffer
+ *              in big-endian order.
+ */
+static void write_be32(uint8_t out[4], uint32_t val) {
+    out[0] = (uint8_t)((val >> 24) & 0xFFU);
+    out[1] = (uint8_t)((val >> 16) & 0xFFU);
+    out[2] = (uint8_t)((val >> 8)  & 0xFFU);
+    out[3] = (uint8_t)( val        & 0xFFU);
+}
 
 static uint8_t * prepare_stego_payload(
     cli c, 
@@ -21,7 +33,7 @@ static uint8_t * prepare_stego_payload(
 ) {
     uint32_t real_file_size = (uint32_t) in_file_size;
 
-    // Get input file extension
+    // Get input file extension (includes leading dot, e.g. ".txt")
     char file_ext_buff[MAX_FILE_EXTENSION_BUFF];
     if (!get_file_extension(in_filename, false, file_ext_buff, MAX_FILE_EXTENSION_BUFF)) {
         LOG_ERROR("Could not get input file extension for path: \"%s\"", in_filename);
@@ -30,14 +42,22 @@ static uint8_t * prepare_stego_payload(
     size_t file_ext_len_with_term = strlen(file_ext_buff) + 1;
 
     // Reserve memory for the unencrypted payload
-    size_t unencrypted_payload_size =   sizeof(uint32_t) +              // DWORD with real embedded file size
+    size_t unencrypted_payload_size =   sizeof(uint32_t) +              // DWORD with real embedded file size (big-endian)
                                         in_file_size +                  // Input file size
                                         file_ext_len_with_term;         // File extension + null terminating byte
     uint8_t * unencrypted_payload = malloc(unencrypted_payload_size);
+    if (!unencrypted_payload) {
+        LOG_ERROR("Memory allocation failed for steganography payload");
+        return nullptr;
+    }
 
-    // Load unencrypted payload
-    memcpy(unencrypted_payload, &real_file_size, sizeof(uint32_t));
-    fread(unencrypted_payload + sizeof(uint32_t), sizeof(uint8_t), in_file_size, in_file);
+    // Load unencrypted payload: 4-byte Big-Endian size || file bytes || extension with '\0'
+    write_be32(unencrypted_payload, real_file_size);
+    if (fread(unencrypted_payload + sizeof(uint32_t), sizeof(uint8_t), in_file_size, in_file) != in_file_size) {
+        LOG_ERROR("Failed to read input file contents from \"%s\"", in_filename);
+        free(unencrypted_payload);
+        return nullptr;
+    }
     memcpy(unencrypted_payload + sizeof(uint32_t) + in_file_size, file_ext_buff, file_ext_len_with_term);
 
     // Generate new encrypted payload if requested
@@ -69,7 +89,7 @@ int embed_main(cli c, bool verbose, size_t in_file_size) {
     FILE *      in_file         = nullptr;
     uint8_t *   payload         = nullptr;
     
-    // Get filenames from cli
+    // Get filenames and steganography algorithm from cli
     const char * in_filename    = nullptr;
     if (!cli_get_string(c, CLI_OPT_IN_LONG, &in_filename)) {
         LOG_ERROR("Could not get input file name from cli");
@@ -91,28 +111,67 @@ int embed_main(cli c, bool verbose, size_t in_file_size) {
     }
     if (verbose) LOG_INFO("Output file: \"%s\"", out_filename);
 
+    const char * steg_alg_str   = nullptr;
+    stego_alg_t steg_alg;
+    if (!cli_get_string(c, CLI_OPT_STEG_LONG, &steg_alg_str) || !stego_alg_from_string(steg_alg_str, &steg_alg)) {
+        LOG_ERROR("Invalid or missing steganography algorithm");
+        goto cleanup;
+    }
+    if (verbose) LOG_INFO("Steganography algorithm: %s", stego_alg_to_string(steg_alg));
+
     // Open input file
     if (!(in_file = fopen(in_filename, "rb"))) {
         LOG_ERROR("Could not open input file");
         goto cleanup;
     }
 
-    // Load bitmap
+    // Load bitmap and calculate the maximum payload capacity (maximum amount of bytes the
+    // carrier can have for the selected steganography algorithm)
     if (!(bmp = bitmap_create(bmp_filename))) {
         LOG_ERROR("Unknown error loading bitmap: \"%s\"", bmp_filename);
         goto cleanup;
     }
     size_t carrier_capacity = bitmap_get_total_bytes(bmp);
-    if (verbose) LOG_INFO("Loaded bitmap (capacity: %lu bytes)", carrier_capacity);
+    size_t max_payload_capacity = stego_get_max_capacity(steg_alg, bmp);
+    if (verbose) {
+        LOG_INFO(
+            "Loaded bitmap (carrier bytes: %lu, max %s payload capacity: %lu bytes)",
+            carrier_capacity,
+            stego_alg_to_string(steg_alg),
+            max_payload_capacity
+        );
+    }
 
-    // Prepare steganography payload (unencrypted)
+    // Prepare steganography payload
     size_t payload_size = 0;
     payload = prepare_stego_payload(c, in_filename, in_file, in_file_size, &payload_size);
     if (!payload || payload_size == 0) goto cleanup;    // prepare_stego_payload already logs errors
-    if (verbose) LOG_INFO("Prepared payload (total size: %lu)", payload_size);
+    if (verbose) LOG_INFO("Prepared payload (total size: %lu bytes)", payload_size);
+
+    // Check carrier capacity
+    if (payload_size > max_payload_capacity) {
+        LOG_ERROR(
+            "Carrier bitmap cannot hold the payload (required: %lu bytes, maximum carrier capacity for %s: %lu bytes)",
+            payload_size,
+            stego_alg_to_string(steg_alg),
+            max_payload_capacity
+        );
+        goto cleanup;
+    }
 
     // Embed the payload into the image
-    // TODO
+    if (!stego_embed(steg_alg, bmp, payload, payload_size)) {
+        LOG_ERROR("Failed to embed payload into bitmap using %s", stego_alg_to_string(steg_alg));
+        goto cleanup;
+    }
+    if (verbose) LOG_INFO("Embedded %lu bytes into bitmap using %s", payload_size, stego_alg_to_string(steg_alg));
+
+    // Save the modified bitmap to the output file
+    if (!bitmap_save(bmp, out_filename)) {
+        LOG_ERROR("Could not save output bitmap to \"%s\"", out_filename);
+        goto cleanup;
+    }
+    LOG_INFO("Saved output bitmap to \"%s\"", out_filename);
 
     exit_status = EXIT_SUCCESS;
 
