@@ -82,9 +82,9 @@ static const cli_option CRYPTO_CLI_OPTIONS[] = {
 // 2. `EVP_CIPHER_CTX *`:
 //    An opaque state machine (context) allocated on the heap for a single
 //    encryption or decryption operation. Every operation follows 3 steps:
-//      a) `EVP_EncryptInit_ex` / `EVP_DecryptInit_ex`: Load the cipher, Key, and IV.
-//      b) `EVP_EncryptUpdate`  / `EVP_DecryptUpdate`:  Process the input buffer.
-//      c) `EVP_EncryptFinal_ex`/ `EVP_DecryptFinal_ex`: Handle the last block & PKCS#5/PKCS#7 padding.
+//      a) `EVP_CipherInit_ex`:  Load the cipher, Key, IV, and direction (1=encrypt, 0=decrypt).
+//      b) `EVP_CipherUpdate`:   Process the input buffer blocks.
+//      c) `EVP_CipherFinal_ex`: Handle the last block & PKCS#5/PKCS#7 padding.
 // ============================================================================
 
 #define PBKDF2_SALT_LEN     8
@@ -185,6 +185,85 @@ static bool derive_key_and_iv(
     return true;
 }
 
+#define OPENSSL_DECRYPT 0
+#define OPENSSL_ENCRYPT 1
+
+/**
+ * @brief       Internal unified routine for both encryption (`enc = 1`) and
+ *              decryption (`enc = 0`) using OpenSSL's generic `EVP_Cipher*` API.
+ */
+static uint8_t * crypto_cipher_transform(
+    const EVP_CIPHER * cipher,
+    const char * password,
+    const uint8_t * in_data,
+    size_t in_len,
+    size_t * out_len,
+    int enc
+) {
+    if (!cipher || !password || !in_data || !out_len) return nullptr;
+
+    // 1. Derive the symmetric Key and IV from the password
+    uint8_t key[EVP_MAX_KEY_LENGTH] = {0};
+    uint8_t iv[EVP_MAX_IV_LENGTH]   = {0};
+    if (!derive_key_and_iv(cipher, password, key, iv)) {
+        return nullptr;
+    }
+
+    uint8_t * out_data = nullptr;
+
+    // 2. Create and initialize a new OpenSSL cipher context on the heap
+    EVP_CIPHER_CTX * ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) goto cleanup;
+
+    // 3. Allocate output buffer.
+    //    Why `in_len + block_size`?
+    //    Block modes (ECB, CBC) use PKCS#5/PKCS#7 padding by default in OpenSSL,
+    //    which adds between 1 and `block_size` extra bytes at the end when encrypting.
+    int block_size = EVP_CIPHER_block_size(cipher);
+    out_data = malloc(in_len + (size_t) block_size);
+    if (!out_data) goto cleanup;
+
+    // OpenSSL uses `int` out-parameters to report how many bytes each step wrote:
+    // - `update_len`: bytes written by `EVP_CipherUpdate`
+    // - `final_len`:  bytes written by `EVP_CipherFinal_ex` (the padded/unpadded last block)
+    int update_len = 0;
+    int final_len  = 0;
+
+    // Pass `nullptr` for IV if the mode does not use an IV (i.e. ECB mode)
+    const uint8_t * iv_ptr = EVP_CIPHER_iv_length(cipher) > 0 ? iv : nullptr;
+
+    // 4. Run the 3-step OpenSSL cipher pipeline:
+    //    - Step A (`EVP_CipherInit_ex`): Configure context with cipher, key, IV, and direction:
+    //      `enc = 1` for encryption, `enc = 0` for decryption.
+    //      (The 3rd parameter `ENGINE *impl` is `nullptr` to use OpenSSL's default implementation).
+    //      Note: PKCS#5/PKCS#7 padding is automatically enabled by default.
+    //    - Step B (`EVP_CipherUpdate`): Process input blocks into `out_data`.
+    //      Sets `update_len` to the number of bytes written so far.
+    //    - Step C (`EVP_CipherFinal_ex`): Process the final block at `out_data + update_len`:
+    //      * When encrypting (`enc = 1`): appends PKCS#5/PKCS#7 padding and encrypts the last block.
+    //      * When decrypting (`enc = 0`): decrypts the last block, verifies and strips the padding
+    //        (if the password/key is wrong, padding verification fails here and returns 0!).
+    if (    EVP_CipherInit_ex(ctx, cipher, nullptr, key, iv_ptr, enc)           != 1 
+        ||  EVP_CipherUpdate(ctx, out_data, &update_len, in_data, (int) in_len) != 1 
+        ||  EVP_CipherFinal_ex(ctx, out_data + update_len, &final_len)          != 1
+    ) {
+        free(out_data);
+        out_data = nullptr;
+        goto cleanup;
+    }
+
+    // Total output size is the sum of bytes produced by Update + Final
+    *out_len = (size_t)(update_len + final_len);
+
+cleanup:
+    // 5. Free the OpenSSL context and wipe sensitive key/IV from stack memory
+    if (ctx) EVP_CIPHER_CTX_free(ctx);
+    OPENSSL_cleanse(key, sizeof(key));
+    OPENSSL_cleanse(iv, sizeof(iv));
+
+    return out_data;
+}
+
 /**
  * @brief       Encrypt a plaintext buffer using the specified OpenSSL `EVP_CIPHER` and password.
  *              Allocates and returns the ciphertext buffer (`*out_ciphertext_len` bytes).
@@ -196,66 +275,7 @@ static uint8_t * crypto_encrypt(
     size_t plaintext_len,
     size_t * out_ciphertext_len
 ) {
-    if (!cipher || !password || !plaintext || !out_ciphertext_len) return nullptr;
-
-    // 1. Derive Key and IV from the password
-    uint8_t key[EVP_MAX_KEY_LENGTH] = {0};
-    uint8_t iv[EVP_MAX_IV_LENGTH]   = {0};
-    if (!derive_key_and_iv(cipher, password, key, iv)) {
-        return nullptr;
-    }
-
-    uint8_t * ciphertext = nullptr;
-
-    // 2. Create and initialize a new OpenSSL cipher context on the heap
-    EVP_CIPHER_CTX * ctx = EVP_CIPHER_CTX_new();
-    if (!ctx) goto cleanup;
-
-    // 3. Allocate output buffer for the ciphertext.
-    //    Why `plaintext_len + block_size`?
-    //    Block modes (ECB, CBC) use PKCS#5/PKCS#7 padding by default in OpenSSL,
-    //    which always adds between 1 and `block_size` extra bytes at the end.
-    int block_size = EVP_CIPHER_block_size(cipher);
-    ciphertext = malloc(plaintext_len + (size_t) block_size);
-    if (!ciphertext) goto cleanup;
-
-    // OpenSSL uses `int` out-parameters to report how many bytes each step wrote:
-    // - `update_len`: bytes written by `EVP_EncryptUpdate`
-    // - `final_len`:  bytes written by `EVP_EncryptFinal_ex` (the padded last block)
-    int update_len = 0;
-    int final_len  = 0;
-
-    // Pass `nullptr` for IV if the mode does not use an IV (i.e. ECB mode)
-    const uint8_t * iv_ptr = EVP_CIPHER_iv_length(cipher) > 0 ? iv : nullptr;
-
-    // 4. Run the 3-step OpenSSL encryption pipeline:
-    //    - Step A (`EVP_EncryptInit_ex`): Configure context with cipher, key, and IV.
-    //      (The 3rd parameter `ENGINE *impl` is `nullptr` to use OpenSSL's default implementation).
-    //      Note: PKCS#5/PKCS#7 padding is automatically enabled by default.
-    //    - Step B (`EVP_EncryptUpdate`): Encrypt input data blocks into `ciphertext`.
-    //      Sets `update_len` to the number of ciphertext bytes written so far.
-    //    - Step C (`EVP_EncryptFinal_ex`): Pad and encrypt any remaining partial block,
-    //      writing it at `ciphertext + update_len` (right after Step B's output),
-    //      and setting `final_len` to the number of final bytes written.
-    if (    EVP_EncryptInit_ex(ctx, cipher, nullptr, key, iv_ptr)                               != 1 
-        ||  EVP_EncryptUpdate(ctx, ciphertext, &update_len, plaintext, (int) plaintext_len)     != 1 
-        ||  EVP_EncryptFinal_ex(ctx, ciphertext + update_len, &final_len)                       != 1
-    ) {
-        free(ciphertext);
-        ciphertext = nullptr;
-        goto cleanup;
-    }
-
-    // Total encrypted size is the sum of bytes produced by Update + Final
-    *out_ciphertext_len = (size_t)(update_len + final_len);
-
-cleanup:
-    // 5. Free the OpenSSL context and wipe sensitive key/IV from stack memory
-    if (ctx) EVP_CIPHER_CTX_free(ctx);
-    OPENSSL_cleanse(key, sizeof(key));
-    OPENSSL_cleanse(iv, sizeof(iv));
-
-    return ciphertext;
+    return crypto_cipher_transform(cipher, password, plaintext, plaintext_len, out_ciphertext_len, OPENSSL_ENCRYPT);
 }
 
 /**
@@ -269,56 +289,7 @@ static uint8_t * crypto_decrypt(
     size_t ciphertext_len,
     size_t * out_plaintext_len
 ) {
-    if (!cipher || !password || !ciphertext || !out_plaintext_len) return nullptr;
-
-    // 1. Derive the exact same Key and IV from the password
-    uint8_t key[EVP_MAX_KEY_LENGTH] = {0};
-    uint8_t iv[EVP_MAX_IV_LENGTH]   = {0};
-    if (!derive_key_and_iv(cipher, password, key, iv)) {
-        return nullptr;
-    }
-
-    uint8_t * plaintext = nullptr;
-
-    // 2. Create a new OpenSSL cipher context
-    EVP_CIPHER_CTX * ctx = EVP_CIPHER_CTX_new();
-    if (!ctx) goto cleanup;
-
-    // 3. Allocate output buffer for the decrypted plaintext
-    int block_size = EVP_CIPHER_block_size(cipher);
-    plaintext = malloc(ciphertext_len + (size_t) block_size);
-    if (!plaintext) goto cleanup;
-
-    int update_len = 0;
-    int final_len  = 0;
-    const uint8_t * iv_ptr = EVP_CIPHER_iv_length(cipher) > 0 ? iv : nullptr;
-
-    // 4. Run the 3-step OpenSSL decryption pipeline:
-    //    - Step A (`EVP_DecryptInit_ex`): Configure context with cipher, key, and IV.
-    //    - Step B (`EVP_DecryptUpdate`): Decrypt ciphertext blocks into `plaintext`.
-    //    - Step C (`EVP_DecryptFinal_ex`): Decrypt the final block, verify and strip
-    //      the PKCS#5/PKCS#7 padding, and write any remaining plaintext bytes at
-    //      `plaintext + update_len`. (If the password/key is wrong, padding verification
-    //      fails here and `EVP_DecryptFinal_ex` returns 0!).
-    if (    EVP_DecryptInit_ex(ctx, cipher, nullptr, key, iv_ptr)                               != 1 
-        ||  EVP_DecryptUpdate(ctx, plaintext, &update_len, ciphertext, (int) ciphertext_len)    != 1 
-        ||  EVP_DecryptFinal_ex(ctx, plaintext + update_len, &final_len)                        != 1
-    ) {
-        free(plaintext);
-        plaintext = nullptr;
-        goto cleanup;
-    }
-
-    // Total decrypted plaintext size (with padding already stripped by OpenSSL)
-    *out_plaintext_len = (size_t)(update_len + final_len);
-
-cleanup:
-    // 5. Free the OpenSSL context and wipe sensitive key/IV from stack memory
-    if (ctx) EVP_CIPHER_CTX_free(ctx);
-    OPENSSL_cleanse(key, sizeof(key));
-    OPENSSL_cleanse(iv, sizeof(iv));
-
-    return plaintext;
+    return crypto_cipher_transform(cipher, password, ciphertext, ciphertext_len, out_plaintext_len, OPENSSL_DECRYPT);
 }
 
 // ============================================================================
