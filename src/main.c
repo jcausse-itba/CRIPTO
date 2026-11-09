@@ -12,6 +12,7 @@ static LoggerConfig logger_config = {
     .min_log_level = LOGGER_LEVEL_INFO,
     .with_level = true,
     .with_datetime = false,
+    .with_color = true,
     .flush_immediately = false,
     .log_prefix = nullptr
 };

@@ -1,12 +1,73 @@
+/**
+ * @file        logger.c
+ * @brief       Implementation of a Logger, and macros to easily log
+ *              messages to it.
+ * 
+ * @date        Original: June, 2024. Update: November, 2026.
+ * @author      Causse, Juan Ignacio (jcausse@itba.edu.ar)
+ */
+
+#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "logger.h"
-#include <stdlib.h>     // malloc(), free()
+#include <stdio.h>
+#include <stdlib.h>     // malloc(), free(), getenv()
 #include <stdarg.h>     // va_list, va_start(), va_end()
+#include <string.h>     // strcmp()
 #include <time.h>       // time_t, time(), localtime(), strftime()
+
+#if defined(_WIN32)
+#include <io.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
+
+static bool stream_is_tty(FILE * stream) {
+    if (!stream) return false;
+    return _isatty(_fileno(stream)) != 0;
+}
+
+static void try_enable_windows_vt(FILE * stream) {
+    HANDLE hOut = (HANDLE)_get_osfhandle(_fileno(stream));
+    if (hOut != INVALID_HANDLE_VALUE) {
+        DWORD dwMode = 0;
+        if (GetConsoleMode(hOut, &dwMode)) {
+            dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+            SetConsoleMode(hOut, dwMode);
+        }
+    }
+}
+#else
+#include <unistd.h>     // isatty(), fileno()
+
+static bool stream_is_tty(FILE * stream) {
+    if (!stream) return false;
+    return isatty(fileno(stream)) != 0;
+}
+#endif
+
+#define ANSI_RESET   "\033[0m"
+#define ANSI_CYAN    "\033[36m"
+#define ANSI_GREEN   "\033[32m"
+#define ANSI_YELLOW  "\033[33m"
+#define ANSI_RED     "\033[31;1m"
+
+static const char * LogLevelColors[LOG_LEVELS_QTY] = {
+    [LOGGER_LEVEL_DEBUG] = ANSI_CYAN,
+    [LOGGER_LEVEL_INFO]  = ANSI_GREEN,
+    [LOGGER_LEVEL_WARN]  = ANSI_YELLOW,
+    [LOGGER_LEVEL_ERROR] = ANSI_RED
+};
 
 typedef struct _Logger_t {
     LogLevels       min_level;
     bool            with_datetime;
     bool            with_level;
+    bool            use_color;
     bool            flush_immediately;
     const char *    log_prefix;
 
@@ -39,14 +100,42 @@ static void get_current_datetime(char * buff, size_t size){
     strftime(buff, size, DATETIME_FORMAT, timeinfo);
 }
 
+static bool should_enable_color(bool requested, FILE * stream) {
+    if (!requested || !stream) {
+        return false;
+    }
+    if (!stream_is_tty(stream)) {
+        return false;
+    }
+    // Respect NO_COLOR standard (https://no-color.org)
+    const char * no_color = getenv("NO_COLOR");
+    if (no_color != nullptr && no_color[0] != '\0') {
+        return false;
+    }
+    // Respect dumb terminal
+    const char * term = getenv("TERM");
+    if (term != nullptr && strcmp(term, "dumb") == 0) {
+        return false;
+    }
+    return true;
+}
+
 static Logger Logger_create_common(LoggerConfig config, FILE * log_file, bool should_close){
     Logger self = malloc(sizeof(_Logger_t));
     if (!self) return nullptr;
+
+    bool use_color = should_enable_color(config.with_color, log_file);
+#if defined(_WIN32)
+    if (use_color) {
+        try_enable_windows_vt(log_file);
+    }
+#endif
 
     /* Initialize configuration */
     self->min_level         = config.min_log_level;
     self->with_datetime     = config.with_datetime;
     self->with_level        = config.with_level;
+    self->use_color         = use_color;
     self->flush_immediately = config.flush_immediately;
     self->log_prefix        = config.log_prefix;
     self->log_file          = log_file;
@@ -96,7 +185,11 @@ bool Logger_log(Logger const self, LogLevels level, const char * restrict fmt, .
     
     /* Add level */
     if (self->with_level){
-        fprintf(self->log_file, "[%s] ", LogLevelsStr[level]);
+        if (self->use_color && level >= 0 && level < LOG_LEVELS_QTY && LogLevelColors[level] != nullptr) {
+            fprintf(self->log_file, "%s[%s]" ANSI_RESET " ", LogLevelColors[level], LogLevelsStr[level]);
+        } else {
+            fprintf(self->log_file, "[%s] ", LogLevelsStr[level]);
+        }
         did_print = true;
     }
     

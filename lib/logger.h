@@ -11,7 +11,7 @@
  *              All direct calls to `Logger_log()` with `LOGGER_LEVEL_DEBUG` passed
  *              as `level` do log debug messages without said constant defined.
  * 
- * @date        June, 2024
+ * @date        Original: June, 2024. Update: November, 2026.
  * @author      Causse, Juan Ignacio (jcausse@itba.edu.ar)
  */
 
@@ -93,6 +93,7 @@ typedef struct {
     LogLevels       min_log_level;      // Minimum level for a message to be logged.
     bool            with_datetime;      // Include date and time in logs.
     bool            with_level;         // Include log level in logs.
+    bool            with_color;         // Enable colors for log levels (when outputting to a TTY).
     bool            flush_immediately;  // Write log to the log file immediately after logging. Helps visualize logs
                                         // in real time when using tail -f command.
     const char *    log_prefix;         // Include a custom prefix string before log messages. nullptr for no prefix.
