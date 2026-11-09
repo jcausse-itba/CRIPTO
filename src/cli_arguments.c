@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdarg.h>
 #include <string.h>
 #include "cli_arguments.h"
 #include "string_utils.h"
