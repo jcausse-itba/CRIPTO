@@ -101,7 +101,7 @@ static const uint8_t PBKDF2_FIXED_SALT[PBKDF2_SALT_LEN] = {0};
  *              - OFB mode uses full-block feedback (`*_ofb()` in OpenSSL: 128-bit for AES, 64-bit for 3DES).
  *              - 3DES uses 3-key Triple DES (`EVP_des_ede3_*()` in OpenSSL).
  */
-static const EVP_CIPHER * get_openssl_cipher(const char * alg, const char * mode) {
+static const EVP_CIPHER * crypto_get_cipher(const char * alg, const char * mode) {
     if (str_equals(alg, "AES128", true)) {
         if (str_equals(mode, "ECB", true)) return EVP_aes_128_ecb();
         if (str_equals(mode, "CFB", true)) return EVP_aes_128_cfb8();
@@ -355,7 +355,7 @@ int main(int argc, const char * argv[]) {
     cli_get_string(c, CLI_OPT_PASS_LONG, &password);
 
     // STEP 1: Get cypher
-    const EVP_CIPHER * cipher = get_openssl_cipher(alg_str, mode_str);
+    const EVP_CIPHER * cipher = crypto_get_cipher(alg_str, mode_str);
 
     printf("=== OpenSSL Crypto Proof of Concept ===\n");
     printf("Algorithm : %s (key=%d bytes)\n", alg_str, EVP_CIPHER_key_length(cipher));
