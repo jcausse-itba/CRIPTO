@@ -26,6 +26,7 @@ static void write_be32(uint8_t out[4], uint32_t val) {
 
 static uint8_t * prepare_stego_payload(
     cli c, 
+    bool verbose,
     const char * const in_filename, 
     FILE * const in_file,
     size_t in_file_size,
@@ -75,6 +76,17 @@ static uint8_t * prepare_stego_payload(
         final_payload = unencrypted_payload;
         final_payload_size = unencrypted_payload_size;
     /* } */
+
+    if (verbose) {
+        LOG_INFO(
+            "Prepared payload (total size: %lu bytes = %luB size header + %luB file data + %luB extension \"%s\\0\")",
+            final_payload_size,
+            sizeof(uint32_t),
+            in_file_size,
+            file_ext_len_with_term,
+            file_ext_buff
+        );
+    }
 
     * out_payload_size = final_payload_size;
     return final_payload;
@@ -144,9 +156,8 @@ int embed_main(cli c, bool verbose, size_t in_file_size) {
 
     // Prepare steganography payload
     size_t payload_size = 0;
-    payload = prepare_stego_payload(c, in_filename, in_file, in_file_size, &payload_size);
+    payload = prepare_stego_payload(c, verbose, in_filename, in_file, in_file_size, &payload_size);
     if (!payload || payload_size == 0) goto cleanup;    // prepare_stego_payload already logs errors
-    if (verbose) LOG_INFO("Prepared payload (total size: %lu bytes)", payload_size);
 
     // Check carrier capacity
     if (payload_size > max_payload_capacity) {

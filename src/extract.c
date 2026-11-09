@@ -236,9 +236,14 @@ int extract_main(cli c, bool verbose) {
         goto cleanup;   // extract_stego_payload already logs errors
     }
     if (verbose) {
+        size_t ext_len_with_term = strlen(file_ext_buff) + 1;
+        size_t total_payload_size = sizeof(uint32_t) + file_size + ext_len_with_term;
         LOG_INFO(
-            "Extracted payload (file size: %lu bytes, extension: \"%s\")",
+            "Extracted payload (total size: %lu bytes = %luB size header + %luB file data + %luB extension \"%s\\0\")",
+            total_payload_size,
+            sizeof(uint32_t),
             file_size,
+            ext_len_with_term,
             file_ext_buff
         );
     }
