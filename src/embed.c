@@ -6,6 +6,7 @@
 #include "cli_arguments.h"
 #include "bitmap.h"
 #include "steganography.h"
+#include "cryptography.h"
 #include "string_utils.h"
 #include "logger.h"
 
@@ -70,31 +71,88 @@ static uint8_t * prepare_stego_payload(
     }
     memcpy(unencrypted_payload + sizeof(uint32_t) + in_file_size, file_ext_buff, file_ext_len_with_term);
 
-    // Generate new encrypted payload if requested
+    // Generate new encrypted payload if password is set
+    bool is_encrypted = false;
+    if (!cli_is_set(c, CLI_OPT_PASS_LONG, &is_encrypted)) {
+        LOG_ERROR("Could not check password option from cli");
+        free(unencrypted_payload);
+        return nullptr;
+    }
+
     uint8_t * final_payload = nullptr;
     size_t final_payload_size = 0;
 
+    if (is_encrypted) {
+        const char * alg_str  = nullptr;
+        const char * mode_str = nullptr;
+        const char * password = nullptr;
+        if (    !cli_get_string(c, CLI_OPT_CIPHER_ALG_LONG, &alg_str) 
+            ||  !cli_get_string(c, CLI_OPT_CIPHER_MODE_LONG, &mode_str) 
+            ||  !cli_get_string(c, CLI_OPT_PASS_LONG, &password)
+        ) {
+            LOG_ERROR("Could not retrieve encryption parameters from cli");
+            free(unencrypted_payload);
+            return nullptr;
+        }
 
-    (void) c;   // TODO: remove
-    /* TODO :
-    if (CLI argument password is set then requires encryption) {
-        final_payload = encrypt(unencrypted_payload, &final_payload_size)
-    }
+        crypto_cipher cipher = crypto_resolve_cipher(alg_str, mode_str);
+        size_t ciphertext_len = 0;
+        uint8_t * ciphertext = crypto_encrypt(
+            cipher,
+            password,
+            unencrypted_payload,
+            unencrypted_payload_size,
+            &ciphertext_len
+        );
+        free(unencrypted_payload);
+
+        if (!ciphertext) {
+            LOG_ERROR("Failed to encrypt payload using %s-%s", alg_str, mode_str);
+            return nullptr;
+        }
+
+        // Build final payload: 4-byte Big-Endian ciphertext_len || ciphertext
+        final_payload_size = sizeof(uint32_t) + ciphertext_len;
+        final_payload = malloc(final_payload_size);
+        if (!final_payload) {
+            LOG_ERROR("Memory allocation failed for encrypted steganography payload");
+            free(ciphertext);
+            return nullptr;
+        }
+        write_be32(final_payload, (uint32_t) ciphertext_len);
+        memcpy(final_payload + sizeof(uint32_t), ciphertext, ciphertext_len);
+        free(ciphertext);
+
+        if (verbose) {
+            LOG_INFO(
+                "Prepared encrypted payload using %s-%s (total size: %lu bytes = %luB encrypted size header + %luB ciphertext [from %luB plaintext = %luB size header + %luB file data + %luB extension \"%s\\0\"])",
+                alg_str,
+                mode_str,
+                final_payload_size,
+                sizeof(uint32_t),
+                ciphertext_len,
+                unencrypted_payload_size,
+                sizeof(uint32_t),
+                in_file_size,
+                file_ext_len_with_term,
+                file_ext_buff
+            );
+        }
+    } 
     else {
-    */
         final_payload = unencrypted_payload;
         final_payload_size = unencrypted_payload_size;
-    /* } */
 
-    if (verbose) {
-        LOG_INFO(
-            "Prepared payload (total size: %lu bytes = %luB size header + %luB file data + %luB extension \"%s\\0\")",
-            final_payload_size,
-            sizeof(uint32_t),
-            in_file_size,
-            file_ext_len_with_term,
-            file_ext_buff
-        );
+        if (verbose) {
+            LOG_INFO(
+                "Prepared payload (total size: %lu bytes = %luB size header + %luB file data + %luB extension \"%s\\0\")",
+                final_payload_size,
+                sizeof(uint32_t),
+                in_file_size,
+                file_ext_len_with_term,
+                file_ext_buff
+            );
+        }
     }
 
     * out_payload_size = final_payload_size;

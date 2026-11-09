@@ -6,6 +6,7 @@
 #include "cli_arguments.h"
 #include "bitmap.h"
 #include "steganography.h"
+#include "cryptography.h"
 #include "logger.h"
 
 #define MAX_FILE_EXTENSION_BUFF 11
@@ -130,16 +131,31 @@ static bool extract_stego_payload(
 
     // 3.1. If payload is encrypted: decrypt and parse (size || real file bytes || real file extension)
     if (is_encrypted) {
-        uint8_t * decrypted_payload = nullptr;
-        size_t decrypted_size = 0;
+        const char * alg_str  = nullptr;
+        const char * mode_str = nullptr;
+        const char * password = nullptr;
+        if (   !cli_get_string(c, CLI_OPT_CIPHER_ALG_LONG, &alg_str) 
+            || !cli_get_string(c, CLI_OPT_CIPHER_MODE_LONG, &mode_str) 
+            || !cli_get_string(c, CLI_OPT_PASS_LONG, &password)
+        ) {
+            LOG_ERROR("Could not retrieve decryption parameters from cli");
+            free(payload);
+            return false;
+        }
 
-        /* TODO:
-        decrypted_payload = decrypt(c, payload, (size_t) payload_size, &decrypted_size);
-        */
-        LOG_ERROR("Decryption is not yet implemented");
+        crypto_cipher cipher = crypto_resolve_cipher(alg_str, mode_str);
+        size_t decrypted_size = 0;
+        uint8_t * decrypted_payload = crypto_decrypt(
+            cipher,
+            password,
+            payload,
+            (size_t) payload_size,
+            &decrypted_size
+        );
         free(payload);
 
         if (!decrypted_payload) {
+            LOG_ERROR("Failed to decrypt payload using %s-%s (wrong password, cipher, or corrupted data)", alg_str, mode_str);
             return false;
         }
 

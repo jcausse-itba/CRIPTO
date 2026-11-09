@@ -30,6 +30,9 @@ if(ENABLE_SANITIZERS AND NOT MSVC)
     add_link_options(-fsanitize=address,undefined)
 endif()
 
+# OpenSSL (libssl & libcrypto)
+find_package(OpenSSL REQUIRED)
+
 # Project core library (all source files in src/ except main.c, and lib/)
 file(GLOB_RECURSE CORE_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
@@ -48,6 +51,7 @@ target_include_directories(stego_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/lib
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+target_link_libraries(stego_core PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 
 # Main executable
 add_executable(stegobmp "${CMAKE_CURRENT_SOURCE_DIR}/src/main.c")
