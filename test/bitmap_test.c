@@ -56,7 +56,7 @@ static void test_invalid_files() {
     }
 }
 
-static void test_padding_skipped_and_modification() {
+static void test_padding_included_and_modification() {
     // 5x2 24bpp BMP: width=5 -> 15 pixel bytes/row, stride 16 (1 padding byte/row)
     const char * path = "/tmp/test_padding.bmp";
     const char * out_path = "/tmp/test_padding_out.bmp";
@@ -107,20 +107,23 @@ static void test_padding_skipped_and_modification() {
     bitmap b = bitmap_create(path);
     ASSERT(b != nullptr);
     if (b) {
-        ASSERT(bitmap_get_total_bytes(b) == 30);
+        // Total bytes includes padding (16 * 2 = 32) per Enunciado.pdf Section 5.4
+        ASSERT(bitmap_get_total_bytes(b) == 32);
 
-        // Read all 30 bytes sequentially and check values
-        uint8_t bytes[30];
+        // Read all 32 bytes sequentially and check values
+        uint8_t bytes[32];
         size_t count = 0;
         uint8_t byte = 0;
         while (bitmap_get_byte(b, &byte)) {
-            if (count < 30) bytes[count] = byte;
+            if (count < 32) bytes[count] = byte;
             count++;
         }
-        ASSERT(count == 30);
+        ASSERT(count == 32);
 
         for (int i = 0; i < 15; i++) ASSERT(bytes[i] == (uint8_t)(0x10 + i));
-        for (int i = 0; i < 15; i++) ASSERT(bytes[15 + i] == (uint8_t)(0x20 + i));
+        ASSERT(bytes[15] == 0xEE);
+        for (int i = 0; i < 15; i++) ASSERT(bytes[16 + i] == (uint8_t)(0x20 + i));
+        ASSERT(bytes[31] == 0xEE);
 
         // Rewind and modify the first byte via next_byte
         bitmap_rewind(b);
@@ -128,10 +131,14 @@ static void test_padding_skipped_and_modification() {
         ASSERT(p0 != nullptr && *p0 == 0x10);
         *p0 = 0xAA;
 
-        // Skip to row 1 (byte index 15) using get_byte + set_byte
+        // Advance to row 0 padding byte (index 15) and modify it via get_byte + set_byte
         for (int i = 1; i < 15; i++) {
             ASSERT(bitmap_get_byte(b, &byte));
         }
+        ASSERT(bitmap_get_byte(b, &byte) && byte == 0xEE);
+        ASSERT(bitmap_set_byte(b, 0xCC));
+
+        // Next byte is row 1 pixel 0 (index 16)
         ASSERT(bitmap_get_byte(b, &byte) && byte == 0x20);
         ASSERT(bitmap_set_byte(b, 0xBB));
 
@@ -142,7 +149,6 @@ static void test_padding_skipped_and_modification() {
     }
 
     // Verify saved file directly:
-    // Headers intact, modified pixels intact, padding bytes UNTOUCHED (0xEE)
     FILE * f_out = fopen(out_path, "rb");
     ASSERT(f_out != nullptr);
     if (f_out) {
@@ -152,11 +158,11 @@ static void test_padding_skipped_and_modification() {
 
         // Pixel 0 modified
         ASSERT(buf[54 + 0] == 0xAA);
-        // Padding byte of row 0 is still 0xEE!
-        ASSERT(buf[54 + 15] == 0xEE);
+        // Padding byte of row 0 modified
+        ASSERT(buf[54 + 15] == 0xCC);
         // Pixel 0 of row 1 modified
         ASSERT(buf[54 + 16] == 0xBB);
-        // Padding byte of row 1 is still 0xEE!
+        // Padding byte of row 1 still 0xEE
         ASSERT(buf[54 + 31] == 0xEE);
 
         fclose(f_out);
@@ -169,7 +175,7 @@ static void test_padding_skipped_and_modification() {
 int main(void) {
     test_open_valid_bitmap();
     test_invalid_files();
-    test_padding_skipped_and_modification();
+    test_padding_included_and_modification();
 
     return ASSERT_REPORT();
 }

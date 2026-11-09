@@ -8,25 +8,25 @@ struct bitmap_internal {
     uint8_t * data;             // Complete file dump (including headers and image data)
     size_t size;                // Total size of the file
     size_t data_offset;         // Bitmap bytes start index in the data array
-    size_t row_bytes;           // Total useful pixel bytes per image row (3 bytes per pixel * width)
-    size_t stride;              // Total row size in file in bytes, aligned to a 4-byte multiple
-    size_t total_bytes;         // Total bitmap capacity (which excludes inter-row padding)
-    size_t cursor;              // Reading cursor (does not map to the data array, it is a logical cursor)
+    size_t total_bytes;         // Total bitmap carrier capacity (pixels + inter-row padding)
+    size_t cursor;              // Reading cursor within the image data block
 };
 
 /**
  * NOTE: BMP Row Stride & Padding:
  * In 24 bpp BMP, each pixel has 3 bytes (BGR), so each row contains (width * 3)
- * useful pixel bytes ('row_bytes'). However, the BMP format requires every row
- * in the file to be aligned to a multiple of 4 bytes. When row_bytes is not a
- * multiple of 4, 1 to 3 padding bytes are added at the end of the row.
+ * pixel bytes ('row_bytes'). However, the BMP format requires every row in the
+ * file to be aligned to a multiple of 4 bytes. When row_bytes is not a multiple
+ * of 4, 1 to 3 padding bytes are added at the end of the row.
  *
  * 'stride' is the total row size in the file including this padding:
  *     stride = ((row_bytes + 3) / 4) * 4
  *
- * Tracking stride allows logical pixel indexing to automatically skip padding
- * bytes in O(1) time, preventing channel misalignment and ensuring steganographic
- * data is never written into or read from padding bytes.
+ * Although strict BMP manipulation skips padding bytes (using 'row_bytes * height'
+ * and mapping cursor -> row * stride + col), the assignment specification
+ * (Section 5.4 of Enunciado.pdf) explicitly requires using the entire contiguous
+ * block of pixels + padding bytes ('stride * height') for steganography so all
+ * implementations produce bit-identical results.
  */
 
 bitmap bitmap_create(const char * restrict filename) {
@@ -85,13 +85,13 @@ bitmap bitmap_create(const char * restrict filename) {
     // Load relevant bitmap information
     uint32_t width = (uint32_t) ih.biWidth;             // Image width
     uint32_t height = (uint32_t) labs(ih.biHeight);     // Image height
-    size_t row_bytes = (size_t) width * 3;              // Total useful bytes per image row (3 bytes per pixel * width)
-    size_t stride = ((row_bytes + 3) / 4) * 4;          // Total bytes per image row (useful bytes + alignment padding bytes)
+    size_t row_bytes = (size_t) width * 3;              // Total pixel bytes per image row (3 bytes per pixel * width)
+    size_t stride = ((row_bytes + 3) / 4) * 4;          // Total bytes per image row (pixel bytes + alignment padding bytes)
     size_t data_offset = (size_t) fh.bfOffBits;         // Offset from the start of BITMAPFILEHEADER to the bitmap bits
-    size_t total_bytes = row_bytes * height;            // Total bitmap capacity (which excludes inter-row padding)
+    size_t total_bytes = stride * height;               // Total carrier capacity (includes inter-row padding per specification)
 
     // Check that the file is actually large enough to contain headers + all bytes in the image matrix (considering padding)
-    if ((size_t) size < data_offset + height * stride) {
+    if ((size_t) size < data_offset + total_bytes) {
         free(data);
         return nullptr;
     }
@@ -108,8 +108,6 @@ bitmap bitmap_create(const char * restrict filename) {
         .data = data,
         .size = (size_t) size,
         .data_offset = data_offset,
-        .row_bytes = row_bytes,
-        .stride = stride,
         .total_bytes = total_bytes,
         .cursor = 0
     };
@@ -127,10 +125,7 @@ size_t bitmap_get_total_bytes(bitmap b) {
 
 uint8_t * bitmap_next_byte(bitmap b) {
     if (!b || b->cursor >= b->total_bytes) return nullptr;
-    size_t row = b->cursor / b->row_bytes;
-    size_t col = b->cursor % b->row_bytes;
-    b->cursor++;
-    return &(b->data[b->data_offset + row * b->stride + col]);
+    return &(b->data[b->data_offset + b->cursor++]);
 }
 
 bool bitmap_get_byte(bitmap b, uint8_t * out_byte) {
@@ -142,10 +137,7 @@ bool bitmap_get_byte(bitmap b, uint8_t * out_byte) {
 
 bool bitmap_set_byte(bitmap b, uint8_t byte) {
     if (!b || b->cursor == 0 || b->cursor > b->total_bytes) return false;
-    size_t idx = b->cursor - 1;
-    size_t row = idx / b->row_bytes;
-    size_t col = idx % b->row_bytes;
-    b->data[b->data_offset + row * b->stride + col] = byte;
+    b->data[b->data_offset + b->cursor - 1] = byte;
     return true;
 }
 

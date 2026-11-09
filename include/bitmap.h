@@ -23,19 +23,18 @@ bitmap bitmap_create(const char * restrict filename);
 void bitmap_rewind(bitmap b);
 
 /**
- * @brief       Get total usable pixel bytes in the image (carrier capacity).
- *              Row alignment padding bytes are excluded.
+ * @brief       Get total carrier bytes in the image (including row alignment padding).
  * 
  * @param[in]   b           `bitmap` instance.
  * 
- * @return      Total usable pixel bytes (width * height * 3).
+ * @return      Total carrier bytes (stride * height).
  */
 size_t bitmap_get_total_bytes(bitmap b);
 
 /**
- * @brief       Get a direct pointer to the next usable carrier byte in memory,
- *              advancing the cursor and skipping row padding. Allows in-place
- *              reading and modification during embedding.
+ * @brief       Get a direct pointer to the next carrier byte in memory,
+ *              advancing the cursor. Allows in-place reading and modification
+ *              during embedding.
  * 
  * @param[in]   b           `bitmap` instance.
  * 
@@ -44,9 +43,8 @@ size_t bitmap_get_total_bytes(bitmap b);
 uint8_t * bitmap_next_byte(bitmap b);
 
 /**
- * @brief       Read the next usable carrier byte, advancing the cursor
- *              and skipping row padding. This is design to be used on
- *              read-only operations.
+ * @brief       Read the next carrier byte, advancing the cursor.
+ *              This is designed to be used on read-only operations.
  * 
  * @param[in]   b           `bitmap` instance.
  * @param[out]  out_byte    Destination pointer for the read byte.
