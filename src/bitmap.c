@@ -119,6 +119,10 @@ void bitmap_rewind(bitmap b) {
     if (b) b->cursor = 0;       // Move logical cursor to start (0)
 }
 
+size_t bitmap_get_cursor(bitmap b) {
+    return b ? b->cursor : 0;
+}
+
 size_t bitmap_get_total_bytes(bitmap b) {
     return b ? b->total_bytes : 0;
 }

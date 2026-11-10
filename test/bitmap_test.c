@@ -20,6 +20,7 @@ static void test_open_valid_bitmap() {
     if (!b) return;
 
     ASSERT(bitmap_get_total_bytes(b) == 700 * 700 * 3);
+    ASSERT(bitmap_get_cursor(b) == 0);
 
     // Read first few bytes
     uint8_t first_bytes[6];
@@ -27,9 +28,11 @@ static void test_open_valid_bitmap() {
         bool ok = bitmap_get_byte(b, &first_bytes[i]);
         ASSERT(ok == true);
     }
+    ASSERT(bitmap_get_cursor(b) == 6);
 
     // Rewind and verify first bytes match
     bitmap_rewind(b);
+    ASSERT(bitmap_get_cursor(b) == 0);
     for (int i = 0; i < 6; i++) {
         uint8_t byte = 0;
         bool ok = bitmap_get_byte(b, &byte);

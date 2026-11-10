@@ -23,6 +23,15 @@ bitmap bitmap_create(const char * restrict filename);
 void bitmap_rewind(bitmap b);
 
 /**
+ * @brief       Get the current cursor position within the carrier image data block.
+ * 
+ * @param[in]   b           `bitmap` instance.
+ * 
+ * @return      Current cursor offset in bytes from the start of the carrier data, or 0 if `b` is `nullptr`.
+ */
+size_t bitmap_get_cursor(bitmap b);
+
+/**
  * @brief       Get total carrier bytes in the image (including row alignment padding).
  * 
  * @param[in]   b           `bitmap` instance.
