@@ -7,17 +7,15 @@
 #include <string.h>
 
 /**
- * Helper to create a synthetic 24bpp uncompressed V3 BMP file with known carrier bytes.
- * Width = 4 -> 12 bytes/row (already a multiple of 4, so stride = 12).
- * Height = 4 -> 48 total carrier bytes.
+ * Helper to create a synthetic 24bpp uncompressed V3 BMP file with custom dimensions.
  */
-static bool create_dummy_bmp(const char * path, uint8_t fill_byte) {
+static bool create_custom_bmp(const char * path, uint32_t width, uint32_t height, uint8_t fill_byte) {
     FILE * f = fopen(path, "wb");
     if (!f) return false;
 
-    const uint32_t width = 4;
-    const uint32_t height = 4;
-    const uint32_t data_size = width * 3 * height; // 48 bytes
+    size_t row_bytes = (size_t) width * 3;
+    size_t stride = ((row_bytes + 3) / 4) * 4;
+    uint32_t data_size = (uint32_t)(stride * height);
 
     BITMAPFILEHEADER fh = {
         .bfType = 0x4D42,
@@ -50,6 +48,15 @@ static bool create_dummy_bmp(const char * path, uint8_t fill_byte) {
 
     fclose(f);
     return true;
+}
+
+/**
+ * Helper to create a synthetic 24bpp uncompressed V3 BMP file with known carrier bytes.
+ * Width = 4 -> 12 bytes/row (already a multiple of 4, so stride = 12).
+ * Height = 4 -> 48 total carrier bytes.
+ */
+static bool create_dummy_bmp(const char * path, uint8_t fill_byte) {
+    return create_custom_bmp(path, 4, 4, fill_byte);
 }
 
 static void test_alg_string_conversion(void) {
@@ -319,12 +326,165 @@ static void test_full_payload_structure_roundtrip(void) {
     remove(out_path);
 }
 
+static void test_lsbi_no_inversion_needed(void) {
+    const char * path = "/tmp/test_stego_lsbi_no_inv.bmp";
+    // Fill with 0x00 (pattern '00', LSB 0)
+    ASSERT(create_dummy_bmp(path, 0x00));
+
+    bitmap bmp = bitmap_create(path);
+    ASSERT(bmp != nullptr);
+    if (bmp) {
+        // Embed 2 zero bytes: since all carrier bits are 0 and payload bits are 0,
+        // changed = 0, unchanged = 16 for pattern '00'.
+        // No inversion needed -> all 4 control bits in bytes 0..3 must remain 0!
+        const uint8_t payload[2] = { 0x00, 0x00 };
+        ASSERT(stego_embed(STEGO_ALG_LSBI, bmp, payload, sizeof(payload)));
+
+        // Verify the 4 header bytes have LSB = 0
+        for (size_t p = 0; p < 4; p++) {
+            uint8_t hdr = 0;
+            ASSERT(bitmap_get_byte_at(bmp, p, &hdr));
+            ASSERT((hdr & 0x01U) == 0);
+        }
+
+        // Verify extraction
+        bitmap_rewind(bmp);
+        uint8_t extracted[2] = { 0xFF, 0xFF };
+        ASSERT(stego_extract_bytes(STEGO_ALG_LSBI, bmp, extracted, sizeof(extracted)));
+        ASSERT(extracted[0] == 0x00 && extracted[1] == 0x00);
+
+        bitmap_destroy(bmp);
+    }
+    remove(path);
+}
+
+static void test_lsbi_all_inverted(void) {
+    const char * path = "/tmp/test_stego_lsbi_all_inv.bmp";
+    // 8x4 = 32 pixels = 96 carrier bytes.
+    ASSERT(create_custom_bmp(path, 8, 4, 0x00));
+
+    bitmap bmp = bitmap_create(path);
+    ASSERT(bmp != nullptr);
+    if (bmp) {
+        // Setup bytes starting at index 4 (G1) with repeating patterns 00, 01, 10, 11 (LSB=0)
+        // Indices where (idx % 3 == 2) are Red and will be skipped.
+        // For usable bytes (B and G), cycle through:
+        // pattern 00 (0x00: bits 2..1 = 00, LSB = 0)
+        // pattern 01 (0x02: bits 2..1 = 01, LSB = 0)
+        // pattern 10 (0x04: bits 2..1 = 10, LSB = 0)
+        // pattern 11 (0x06: bits 2..1 = 11, LSB = 0)
+        bitmap_rewind(bmp);
+        // Skip header bytes 0..3
+        for (int i = 0; i < 4; i++) bitmap_next_byte(bmp);
+
+        uint8_t test_patterns[4] = { 0x00, 0x02, 0x04, 0x06 };
+        size_t pat_idx = 0;
+        while (bitmap_get_cursor(bmp) < bitmap_get_total_bytes(bmp)) {
+            size_t curr = bitmap_get_cursor(bmp);
+            uint8_t * p = bitmap_next_byte(bmp);
+            if (!p) break;
+            if (curr % 3 == 2) {
+                *p = 0xAA; // Red channel canary
+            } else {
+                *p = test_patterns[pat_idx % 4];
+                pat_idx++;
+            }
+        }
+
+        // Embed payload of 4 bytes with all 1s (0xFF).
+        // Since every carrier byte had LSB = 0 and secret bits are 1,
+        // EVERY carrier byte changes! changed > unchanged for all 4 patterns.
+        // Therefore, all 4 patterns MUST be inverted and header LSBs must be 1, 1, 1, 1.
+        const uint8_t payload[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
+        ASSERT(stego_embed(STEGO_ALG_LSBI, bmp, payload, sizeof(payload)));
+
+        // Verify the 4 header bytes have LSB = 1
+        for (size_t p = 0; p < 4; p++) {
+            uint8_t hdr = 0;
+            ASSERT(bitmap_get_byte_at(bmp, p, &hdr));
+            ASSERT_MSG((hdr & 0x01U) == 1, "Header bit for pattern should be 1 (inverted)");
+        }
+
+        // Verify Red channel bytes remain untouched (0xAA)
+        for (size_t idx = 4; idx < bitmap_get_total_bytes(bmp); idx++) {
+            if (idx % 3 == 2) {
+                uint8_t red_byte = 0;
+                ASSERT(bitmap_get_byte_at(bmp, idx, &red_byte));
+                ASSERT_MSG(red_byte == 0xAA, "Red channel byte after header must not be modified");
+            }
+        }
+
+        // Verify extraction recovers 0xFF 0xFF 0xFF 0xFF
+        bitmap_rewind(bmp);
+        uint8_t extracted[4] = {0};
+        ASSERT(stego_extract_bytes(STEGO_ALG_LSBI, bmp, extracted, sizeof(extracted)));
+        ASSERT(extracted[0] == 0xFF && extracted[1] == 0xFF && extracted[2] == 0xFF && extracted[3] == 0xFF);
+
+        bitmap_destroy(bmp);
+    }
+    remove(path);
+}
+
+static void test_lsbi_full_payload_roundtrip(void) {
+    const char * path = "/tmp/test_stego_lsbi_full.bmp";
+    const char * out_path = "/tmp/test_stego_lsbi_full_out.bmp";
+    // 12x6 = 72 pixels = 216 bytes.
+    ASSERT(create_custom_bmp(path, 12, 6, 0x55));
+
+    const uint8_t full_payload[13] = {
+        0x00, 0x00, 0x00, 0x04,         // Big-Endian uint32: 4
+        'D',  'A',  'T',  'A',          // 4 file bytes
+        '.',  'b',  'i',  'n',  '\0'    // 5-byte null-terminated extension
+    };
+
+    bitmap bmp = bitmap_create(path);
+    ASSERT(bmp != nullptr);
+    if (bmp) {
+        ASSERT(stego_get_max_capacity(STEGO_ALG_LSBI, bmp) >= sizeof(full_payload));
+        ASSERT(stego_embed(STEGO_ALG_LSBI, bmp, full_payload, sizeof(full_payload)));
+        ASSERT(bitmap_save(bmp, out_path));
+        bitmap_destroy(bmp);
+    }
+
+    // Reload and extract incrementally: 4-byte size, 4-byte content, then null-terminated extension
+    bitmap reloaded = bitmap_create(out_path);
+    ASSERT(reloaded != nullptr);
+    if (reloaded) {
+        uint8_t size_be[4] = {0};
+        ASSERT(stego_extract_bytes(STEGO_ALG_LSBI, reloaded, size_be, 4));
+        uint32_t file_size = ((uint32_t)size_be[0] << 24) |
+                             ((uint32_t)size_be[1] << 16) |
+                             ((uint32_t)size_be[2] << 8)  |
+                             ((uint32_t)size_be[3]);
+        ASSERT(file_size == 4);
+
+        uint8_t content[4] = {0};
+        ASSERT(stego_extract_bytes(STEGO_ALG_LSBI, reloaded, content, file_size));
+        ASSERT(memcmp(content, "DATA", 4) == 0);
+
+        char ext[16] = {0};
+        size_t ext_idx = 0;
+        do {
+            ASSERT(stego_extract_bytes(STEGO_ALG_LSBI, reloaded, (uint8_t *)&ext[ext_idx], 1));
+        } while (ext[ext_idx++] != '\0' && ext_idx < sizeof(ext));
+        ASSERT(strcmp(ext, ".bin") == 0);
+
+        bitmap_destroy(reloaded);
+    }
+
+    remove(path);
+    remove(out_path);
+}
+
 int main(void) {
     test_alg_string_conversion();
     test_max_capacity();
     test_lsb1_bit_order_and_roundtrip();
     test_lsb4_nibble_order_and_roundtrip();
     test_lsbi_inversion_and_roundtrip();
+    test_lsbi_no_inversion_needed();
+    test_lsbi_all_inverted();
+    test_lsbi_full_payload_roundtrip();
     test_full_payload_structure_roundtrip();
 
     return ASSERT_REPORT();

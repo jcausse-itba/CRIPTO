@@ -10,6 +10,7 @@ struct bitmap_internal {
     size_t data_offset;         // Bitmap bytes start index in the data array
     size_t total_bytes;         // Total bitmap carrier capacity (pixels + inter-row padding)
     size_t cursor;              // Reading cursor within the image data block
+    bool has_padding;           // True if rows contain alignment padding bytes
 };
 
 /**
@@ -87,6 +88,7 @@ bitmap bitmap_create(const char * restrict filename) {
     uint32_t height = (uint32_t) labs(ih.biHeight);     // Image height
     size_t row_bytes = (size_t) width * 3;              // Total pixel bytes per image row (3 bytes per pixel * width)
     size_t stride = ((row_bytes + 3) / 4) * 4;          // Total bytes per image row (pixel bytes + alignment padding bytes)
+    bool has_padding = (stride > row_bytes);            // True if image rows require alignment padding bytes
     size_t data_offset = (size_t) fh.bfOffBits;         // Offset from the start of BITMAPFILEHEADER to the bitmap bits
     size_t total_bytes = stride * height;               // Total carrier capacity (includes inter-row padding per specification)
 
@@ -109,7 +111,8 @@ bitmap bitmap_create(const char * restrict filename) {
         .size = (size_t) size,
         .data_offset = data_offset,
         .total_bytes = total_bytes,
-        .cursor = 0
+        .cursor = 0,
+        .has_padding = has_padding
     };
 
     return b;
@@ -142,6 +145,16 @@ bool bitmap_get_byte(bitmap b, uint8_t * out_byte) {
 bool bitmap_set_byte(bitmap b, uint8_t byte) {
     if (!b || b->cursor == 0 || b->cursor > b->total_bytes) return false;
     b->data[b->data_offset + b->cursor - 1] = byte;
+    return true;
+}
+
+bool bitmap_has_padding(bitmap b) {
+    return b ? b->has_padding : false;
+}
+
+bool bitmap_get_byte_at(bitmap b, size_t index, uint8_t * out_byte) {
+    if (!b || index >= b->total_bytes || !out_byte) return false;
+    *out_byte = b->data[b->data_offset + index];
     return true;
 }
 

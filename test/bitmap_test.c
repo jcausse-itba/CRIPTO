@@ -21,12 +21,21 @@ static void test_open_valid_bitmap() {
 
     ASSERT(bitmap_get_total_bytes(b) == 700 * 700 * 3);
     ASSERT(bitmap_get_cursor(b) == 0);
+    ASSERT(!bitmap_has_padding(b));
 
     // Read first few bytes
     uint8_t first_bytes[6];
     for (int i = 0; i < 6; i++) {
         bool ok = bitmap_get_byte(b, &first_bytes[i]);
         ASSERT(ok == true);
+    }
+    ASSERT(bitmap_get_cursor(b) == 6);
+
+    // Verify bitmap_get_byte_at reads arbitrarily without modifying cursor
+    for (int i = 0; i < 6; i++) {
+        uint8_t byte = 0;
+        ASSERT(bitmap_get_byte_at(b, (size_t) i, &byte));
+        ASSERT(byte == first_bytes[i]);
     }
     ASSERT(bitmap_get_cursor(b) == 6);
 
@@ -112,6 +121,7 @@ static void test_padding_included_and_modification() {
     if (b) {
         // Total bytes includes padding (16 * 2 = 32) per Enunciado.pdf Section 5.4
         ASSERT(bitmap_get_total_bytes(b) == 32);
+        ASSERT(bitmap_has_padding(b));
 
         // Read all 32 bytes sequentially and check values
         uint8_t bytes[32];

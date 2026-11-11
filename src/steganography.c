@@ -84,12 +84,13 @@ static bool lsb4_extract_bytes(bitmap bmp, uint8_t * out_buffer, size_t count) {
 // ============================================================================
 // LSBI Strategy Implementation (LSB Improved - Majeed & Sulaiman)
 //
-// Specification (Enunciado.pdf Section 5.3.3 & LSB-Improved.pdf):
+// Specification (Enunciado.pdf Section 5.3.3, LSBI_Paper.pdf, and
+// LSBI_Implementation_Notes.md):
 // 1. The first 4 carrier bytes (indices 0..3: B0, G0, R0, B1) store the 4
 //    inversion-pattern control bits using standard LSB1 (all 3 channels used,
 //    never inverted), corresponding to patterns '00' (0), '01' (1), '10' (2),
 //    and '11' (3).
-// 2. Starting at carrier index 4, payload bits are embedded/extracted 1 bit
+// 2. Starting at carrier index 4 (G1), payload bits are embedded/extracted 1 bit
 //    per carrier byte (MSB to LSB) using only Blue and Green channels; every
 //    Red channel byte (where carrier_idx % 3 == 2) is skipped.
 // 3. Each usable carrier byte belongs to one of 4 patterns defined by its 2nd
@@ -98,7 +99,10 @@ static bool lsb4_extract_bytes(bitmap bmp, uint8_t * out_buffer, size_t count) {
 //    changed during standard LSB1 embedding is strictly greater than those
 //    left unchanged (changed[p] > unchanged[p]), the LSB of all payload
 //    carrier bytes with pattern p is inverted, and pattern bit p is set to 1
-//    (otherwise 0).
+//    (otherwise 0). If no pattern needs inversion, pass 2 is omitted.
+// 5. Extraction is single-pass and stateless: the 4 control bits are read
+//    from the first 4 carrier bytes into a uint8_t[4] array, and each bit
+//    is re-inverted via branchless XOR: bit_val = (carrier & 1) ^ invert[pattern].
 // ============================================================================
 
 #define LSBI_PATTERN_COUNT 4
@@ -113,6 +117,24 @@ static size_t lsbi_max_capacity(size_t carrier_bytes) {
     return usable_bits / 8;
 }
 
+static uint8_t * lsbi_next_carrier_byte(bitmap bmp) {
+    uint8_t * carrier = nullptr;
+    do {
+        carrier = bitmap_next_byte(bmp);
+        if (!carrier) return nullptr;
+    } while (((bitmap_get_cursor(bmp) - 1) % 3) == 2); // Skip Red channel bytes
+    return carrier;
+}
+
+static bool lsbi_get_carrier_byte(bitmap bmp, uint8_t * out_byte) {
+    uint8_t b = 0;
+    do {
+        if (!bitmap_get_byte(bmp, &b)) return false;
+    } while (((bitmap_get_cursor(bmp) - 1) % 3) == 2); // Skip Red channel bytes
+    if (out_byte) *out_byte = b;
+    return true;
+}
+
 static bool lsbi_embed(bitmap bmp, const uint8_t * payload, size_t payload_size) {
     // 1. Reserve pointers to the first 4 carrier bytes (B0, G0, R0, B1) for the pattern map
     uint8_t * pattern_carriers[LSBI_PATTERN_COUNT];
@@ -121,20 +143,16 @@ static bool lsbi_embed(bitmap bmp, const uint8_t * payload, size_t payload_size)
         if (!pattern_carriers[p]) return false;
     }
 
-    // 2. Pass 1: Apply standard LSB1 on B and G channels (skipping R where carrier_idx % 3 == 2)
+    // 2. Pass 1: Apply standard LSB1 on B and G channels (skipping R where byte offset % 3 == 2)
     //    and count how many carrier bytes changed vs remained unchanged per 2-bit pattern.
     size_t changed[LSBI_PATTERN_COUNT]   = {0};
     size_t unchanged[LSBI_PATTERN_COUNT] = {0};
-    size_t carrier_idx = LSBI_PATTERN_COUNT;
 
     for (size_t i = 0; i < payload_size; i++) {
         uint8_t byte = payload[i];
         for (int bit = 7; bit >= 0; bit--) {
-            uint8_t * carrier = nullptr;
-            do {
-                carrier = bitmap_next_byte(bmp);
-                if (!carrier) return false;
-            } while ((carrier_idx++) % 3 == 2); // Skip Red channel byte
+            uint8_t * carrier = lsbi_next_carrier_byte(bmp);
+            if (!carrier) return false;
 
             uint8_t pattern    = (uint8_t)((*carrier >> 1) & 0x03U);
             uint8_t orig_lsb   = (uint8_t)(*carrier & 0x01U);
@@ -152,72 +170,73 @@ static bool lsbi_embed(bitmap bmp, const uint8_t * payload, size_t payload_size)
 
     // 3. Decide which patterns require bit inversion and write the 4 control bits
     //    into the first 4 carrier bytes using normal LSB1.
-    bool invert[LSBI_PATTERN_COUNT];
+    uint8_t inv_mask[LSBI_PATTERN_COUNT] = {0};
+    bool any_inverted = false;
     for (int p = 0; p < LSBI_PATTERN_COUNT; p++) {
-        invert[p] = changed[p] > unchanged[p];
-        uint8_t inv_bit = invert[p] ? 1U : 0U;
-        *pattern_carriers[p] = (uint8_t)((*pattern_carriers[p] & 0xFEU) | inv_bit);
+        if (changed[p] > unchanged[p]) {
+            inv_mask[p] = 1U;
+            any_inverted = true;
+        }
+        *pattern_carriers[p] = (uint8_t)((*pattern_carriers[p] & 0xFEU) | inv_mask[p]);
+    }
+
+    // If no pattern requires inversion, pass 2 is omitted per implementation notes
+    if (!any_inverted) {
+        return true;
     }
 
     // 4. Pass 2: Rewind, skip the 4 pattern bytes, and invert the LSB of all used
-    //    payload carrier bytes whose pattern was marked for inversion.
+    //    payload carrier bytes whose pattern was marked for inversion (branchless XOR).
     bitmap_rewind(bmp);
     for (int p = 0; p < LSBI_PATTERN_COUNT; p++) {
         if (!bitmap_next_byte(bmp)) return false;
     }
 
-    carrier_idx = LSBI_PATTERN_COUNT;
     size_t total_payload_bits = payload_size * 8;
     for (size_t b = 0; b < total_payload_bits; b++) {
-        uint8_t * carrier = nullptr;
-        do {
-            carrier = bitmap_next_byte(bmp);
-            if (!carrier) return false;
-        } while ((carrier_idx++) % 3 == 2); // Skip Red channel byte
+        uint8_t * carrier = lsbi_next_carrier_byte(bmp);
+        if (!carrier) return false;
 
         uint8_t pattern = (uint8_t)((*carrier >> 1) & 0x03U);
-        if (invert[pattern]) {
-            *carrier ^= 0x01U;
-        }
+        *carrier ^= inv_mask[pattern];
     }
 
     return true;
 }
 
 static bool lsbi_extract_bytes(bitmap bmp, uint8_t * out_buffer, size_t count) {
-    // Cached inversion table across sequential chunked calls to stego_extract_bytes.
-    // Refreshed automatically whenever extraction starts from the beginning of the bitmap (cursor == 0).
-    static bool s_invert[LSBI_PATTERN_COUNT] = {false};
-
-    size_t carrier_idx = bitmap_get_cursor(bmp);
-    if (carrier_idx > 0 && carrier_idx < LSBI_PATTERN_COUNT) {
+    size_t cursor = bitmap_get_cursor(bmp);
+    if (cursor > 0 && cursor < LSBI_PATTERN_COUNT) {
         return false; // Invalid cursor state mid-header
     }
 
-    // If at the start of the bitmap, extract the 4 pattern inversion bits from the first 4 bytes (B0, G0, R0, B1)
-    if (carrier_idx == 0) {
+    // If at the start of the bitmap, advance cursor past the 4 header bytes
+    if (cursor == 0) {
         for (int p = 0; p < LSBI_PATTERN_COUNT; p++) {
-            uint8_t hdr_byte = 0;
-            if (!bitmap_get_byte(bmp, &hdr_byte)) return false;
-            s_invert[p] = (hdr_byte & 0x01U) != 0;
+            uint8_t dummy = 0;
+            if (!bitmap_get_byte(bmp, &dummy)) return false;
         }
-        carrier_idx = LSBI_PATTERN_COUNT;
     }
 
-    // Extract `count` payload bytes from B and G channels (skipping R where carrier_idx % 3 == 2)
+    // Read the 4 inversion map bits from the first 4 bytes of the carrier (B0, G0, R0, B1)
+    // using bitmap_get_byte_at without moving the cursor.
+    // Using a uint8_t[4] array allows applying bit inversion via branchless XOR per implementation notes.
+    uint8_t invert[LSBI_PATTERN_COUNT];
+    for (int p = 0; p < LSBI_PATTERN_COUNT; p++) {
+        uint8_t hdr_byte = 0;
+        if (!bitmap_get_byte_at(bmp, (size_t) p, &hdr_byte)) return false;
+        invert[p] = (uint8_t)(hdr_byte & 0x01U);
+    }
+
+    // Extract `count` payload bytes from B and G channels (skipping Red channel where byte_idx % 3 == 2)
     for (size_t i = 0; i < count; i++) {
         uint8_t extracted = 0;
         for (int bit = 7; bit >= 0; bit--) {
             uint8_t carrier = 0;
-            do {
-                if (!bitmap_get_byte(bmp, &carrier)) return false;
-            } while ((carrier_idx++) % 3 == 2); // Skip Red channel byte
+            if (!lsbi_get_carrier_byte(bmp, &carrier)) return false;
 
             uint8_t pattern = (uint8_t)((carrier >> 1) & 0x03U);
-            uint8_t bit_val = (uint8_t)(carrier & 0x01U);
-            if (s_invert[pattern]) {
-                bit_val ^= 0x01U;
-            }
+            uint8_t bit_val = (uint8_t)((carrier & 0x01U) ^ invert[pattern]);
             extracted = (uint8_t)((extracted << 1) | bit_val);
         }
         out_buffer[i] = extracted;
