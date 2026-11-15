@@ -254,6 +254,24 @@ static void test_encryption_without_password_mistakes() {
         cli c = parse_command_line(ARRAY_LEN(argv), argv);
         ASSERT_MSG(c == nullptr, "Should fail when -a and -m are specified without -pass in extract");
     }
+
+    // 4. Empty password (-pass "") in embed
+    {
+        const char *argv[] = {
+            "stegobmp", "-embed", "-in", "msg.txt", "-p", "img.bmp", "-out", "out.bmp", "-steg", "LSB1", "-pass", ""
+        };
+        cli c = parse_command_line(ARRAY_LEN(argv), argv);
+        ASSERT_MSG(c == nullptr, "Should fail when -pass is an empty string in embed");
+    }
+
+    // 5. Empty password (-pass "") with -a and -m in extract
+    {
+        const char *argv[] = {
+            "stegobmp", "-extract", "-p", "img.bmp", "-out", "out.txt", "-steg", "LSBI", "-a", "3des", "-m", "cbc", "-pass", ""
+        };
+        cli c = parse_command_line(ARRAY_LEN(argv), argv);
+        ASSERT_MSG(c == nullptr, "Should fail when -pass is an empty string in extract");
+    }
 }
 
 static void test_missing_required_and_invalid_values_mistakes() {

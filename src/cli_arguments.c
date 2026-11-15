@@ -79,6 +79,18 @@ static bool encryption_decryption_requires_password(cli c) {
     return (!cipher_set && !mode_set) || password_set;
 }
 
+static bool password_not_empty(cli c) {
+    bool password_set = false;
+    const char * password = nullptr;
+
+    if (!cli_is_set(c, CLI_OPT_PASS_LONG, &password_set)) return false;
+    if (!password_set) return true;
+
+    if (!cli_get_string(c, CLI_OPT_PASS_LONG, &password)) return false;
+
+    return password != nullptr && password[0] != '\0';
+}
+
 static bool bitmap_file_should_have_bmp_extension(cli c) {
     const char * picture_filename = nullptr;
     char buff[10];
@@ -114,6 +126,10 @@ static const multi_argument_validation_t MULTI_ARG_VALIDATIONS[] = {
     {
         .fun = encryption_decryption_requires_password,
         .msg = "When using '" CLI_OPT_CIPHER_ALG_SHORT "' or '" CLI_OPT_CIPHER_MODE_SHORT "', '" CLI_OPT_PASS_LONG "' must be defined."
+    },
+    {
+        .fun = password_not_empty,
+        .msg = "Parameter '" CLI_OPT_PASS_LONG "' cannot be empty."
     },
     {
         .fun = bitmap_file_should_have_bmp_extension,
