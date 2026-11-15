@@ -210,21 +210,17 @@ static bool lsbi_extract_bytes(bitmap bmp, uint8_t * out_buffer, size_t count) {
         return false; // Invalid cursor state mid-header
     }
 
-    // If at the start of the bitmap, advance cursor past the 4 header bytes
-    if (cursor == 0) {
-        for (int p = 0; p < LSBI_PATTERN_COUNT; p++) {
-            uint8_t dummy = 0;
-            if (!bitmap_get_byte(bmp, &dummy)) return false;
-        }
-    }
-
-    // Read the 4 inversion map bits from the first 4 bytes of the carrier (B0, G0, R0, B1)
-    // using bitmap_get_byte_at without moving the cursor.
+    // Read the 4 inversion map bits from the first 4 bytes of the carrier (B0, G0, R0, B1).
+    // At cursor == 0, consume them sequentially with bitmap_get_byte; on subsequent chunked calls,
+    // read them via bitmap_get_byte_at without altering the cursor so extraction remains stateless.
     // Using a uint8_t[4] array allows applying bit inversion via branchless XOR per implementation notes.
     uint8_t invert[LSBI_PATTERN_COUNT];
     for (int p = 0; p < LSBI_PATTERN_COUNT; p++) {
         uint8_t hdr_byte = 0;
-        if (!bitmap_get_byte_at(bmp, (size_t) p, &hdr_byte)) return false;
+        bool ok = (cursor == 0)
+            ? bitmap_get_byte(bmp, &hdr_byte)
+            : bitmap_get_byte_at(bmp, (size_t) p, &hdr_byte);
+        if (!ok) return false;
         invert[p] = (uint8_t)(hdr_byte & 0x01U);
     }
 
