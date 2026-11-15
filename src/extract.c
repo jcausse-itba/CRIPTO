@@ -234,6 +234,12 @@ int extract_main(cli c, bool verbose) {
         LOG_ERROR("Unknown error loading bitmap: \"%s\"", bmp_filename);
         goto cleanup;
     }
+    if (steg_alg == STEGO_ALG_LSBI && bitmap_has_padding(bmp)) {
+        LOG_WARN(
+            "Carrier bitmap \"%s\" contains row padding bytes; LSBI assumes images without padding, which may desynchronize channel pattern alignment",
+            bmp_filename
+        );
+    }
     size_t carrier_capacity = bitmap_get_total_bytes(bmp);
     size_t max_payload_capacity = stego_get_max_capacity(steg_alg, bmp);
     if (verbose) {

@@ -23,6 +23,15 @@ bitmap bitmap_create(const char * restrict filename);
 void bitmap_rewind(bitmap b);
 
 /**
+ * @brief       Get the current cursor position within the carrier image data block.
+ * 
+ * @param[in]   b           `bitmap` instance.
+ * 
+ * @return      Current cursor offset in bytes from the start of the carrier data, or 0 if `b` is `nullptr`.
+ */
+size_t bitmap_get_cursor(bitmap b);
+
+/**
  * @brief       Get total carrier bytes in the image (including row alignment padding).
  * 
  * @param[in]   b           `bitmap` instance.
@@ -64,6 +73,27 @@ bool bitmap_get_byte(bitmap b, uint8_t * out_byte);
  * @return      `true` on success, `false` if no byte has been read yet.
  */
 bool bitmap_set_byte(bitmap b, uint8_t byte);
+
+/**
+ * @brief       Check if the bitmap contains row alignment padding bytes.
+ * 
+ * @param[in]   b           `bitmap` instance.
+ * 
+ * @return      `true` if rows contain padding, `false` otherwise or if `b` is `nullptr`.
+ */
+bool bitmap_has_padding(bitmap b);
+
+/**
+ * @brief       Read a carrier byte at a specific offset from the beginning of the image
+ *              data block without altering the sequential reading cursor.
+ * 
+ * @param[in]   b           `bitmap` instance.
+ * @param[in]   index       Byte offset within the carrier data block.
+ * @param[out]  out_byte    Destination pointer for the read byte.
+ * 
+ * @return      `true` on success, `false` if out of bounds or `b` is `nullptr`.
+ */
+bool bitmap_get_byte_at(bitmap b, size_t index, uint8_t * out_byte);
 
 /**
  * @brief       Write the entire in-memory bitmap (with original headers,
