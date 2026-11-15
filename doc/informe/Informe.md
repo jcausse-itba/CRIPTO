@@ -67,23 +67,50 @@
    - [4.3. Dificultades Encontradas durante la Implementación](#43-dificultades-encontradas-durante-la-implementación) *(IX)*
    - [4.4. Propuestas de Mejoras y Extensiones Futuras](#44-propuestas-de-mejoras-y-extensiones-futuras) *(X)*
 
----
+<div style="page-break-after: always;"></div>
 
 ## 1. Discusión sobre la Publicación Científica (Majeed & Sulaiman)
 
-*Análisis crítico del artículo "An Improved LSB Image Steganography Technique using bit-inverse in 24 bit colour image" (Majeed & Sulaiman, 2015) — Apartado I.*
+*Análisis crítico del artículo "An Improved LSB Image Steganography Technique using bit-inverse in 24 bit colour image" (Majeed & Sulaiman, 2015, Journal of Theoretical and Applied Information Technology, Vol. 80, No. 2, pp. 342–348) — Apartado I.*
 
 ### 1.1. Organización Formal del Documento
 
 *(Apartado I.a)*
 
-> *Completar con la evaluación crítica sobre la estructura formal del paper: resumen (abstract), introducción, revisión de trabajos relacionados, presentación de la metodología propuesta, exposición de resultados experimentales, conclusiones, referencias y flujo general del contenido.*
+El artículo presenta la estructura habitual de una publicación científica: un resumen inicial (*Abstract* y *Keywords*), ocho secciones numeradas y la bibliografía final. No obstante, al evaluar su organización formal se detectan desbalances estructurales y falencias editoriales relevantes:
+
+1. **Redundancia y desproporción en las secciones introductorias:**
+   Las primeras cuatro secciones (*1. Introduction*, *2. The Standard Least-Significant-Bit Technique*, *3. 24 Bit Color Image* y *4. Least Significant Bit*) consumen casi tres de las siete páginas del _paper_. En lugar de resumir los preliminares de manera concisa, los autores reiteran nociones básicas, como la diferencia entre esteganografía y criptografía, la composición RGB de 24 bits y la sustitución LSB estándar, en múltiples apartados consecutivos, postergando el aporte principal del _paper_.
+2. **Falta la organización del _paper_ al cierre de la Introducción:**
+   Al final de la Sección 1 (p. 343), el texto dice *"This paper is organized as follows:"*, pero falta el detalle o listado de secciones y pasa directamente a la Sección 2.
+3. **Separación artificial entre descripción y pseudocódigo (Secciones 5 y 6):**
+   El método propuesto se divide en *5. The Proposed Bit Inversion Technique* (pp. 344–345, enumeración de pasos y ejemplo numérico) y *6. The Proposed Bit Inversion Algorithm* (pp. 345–346, pseudocódigo). Ambas secciones describen el mismo algoritmo de inserción y resultarían mucho más claras unificadas en una sola sección metodológica que incluya, además, **el algoritmo formal de extracción (*de-steganography*)**, el cual carece de pseudocódigo y apenas se describe en prosa al final de la Sección 5.
+4. **Sección experimental y conclusiones (Secciones 7 y 8):**
+   La Sección 7 (*Simulation Result*, pp. 346–347) expone imágenes de prueba, histogramas comparativos (Figs. 3–5) y tablas de PSNR frente a tres trabajos previos de la literatura, pero carece de pruebas estadísticas de estegoanálisis que validen cuantitativamente la resistencia frente a detección. Además, la Sección 8 (*Discussion and Conclusion*, pp. 347–348) reproduce prácticamente las mismas afirmaciones del *Abstract* sin mayor agregado de valor.
+5. **Errores editoriales, tipográficas y bibliográficas:**
+   El _paper_ exhibe algunas fallas de revisión:
+   - El título de la bibliografía está mal escrito como **`REFRENCES`** (p. 348).
+   - Errores gramaticales y de tipeo recurrentes en inglés (*"less numbers of pixels"*, *"a steg-image"*, *"In In steganography"*, *"the lest significant bit"*, *"this this proposed method"*).
+   - Inconsistencias en los nombres de los archivos de prueba entre el texto, las figuras y las tablas (`Baboon.jpg` vs. `Babbon.jpg`, `Peppers.jpg` vs. `Pepper.jpg`, `trees.jpg` vs. `tree . jpg`, `Tiffany.jpg` vs. `tifanny. Jpg`).
+   - Referencias bibliográficas incompletas o con formato heterogéneo en la lista final del artículo (por ejemplo, la referencia 7 carece de año y sede de publicación, y las referencias 11 y 12 presentan formato irregular en títulos y fuentes).
+   
+   Esto, sumado a que (en lo personal, a los integrantes del Grupo 10) nos resultó "rara" o "difícil" la redacción en varios apartados, nos hace notar que este _paper_ careció de revisión editorial apropiada fuera de lo que refiere a cuestiones puramente técnicas.
 
 ### 1.2. Descripción del Algoritmo
 
 *(Apartado I.b)*
 
-> *Completar describiendo cómo los autores presentan el algoritmo LSBI (selección de canales G y B omitiendo R, clasificación por patrones de 2 bits, criterio de inversión de LSB y fase de extracción), evaluando si la explicación teórica, los pasos y los diagramas explicativos resultan claros y suficientes para reproducir su implementación.*
+La propuesta de Majeed y Sulaiman combina dos ideas sobre imágenes de colores de 24 bits con el objetivo de elevar la relación señal-ruido pico (PSNR) y complejizar la recuperación no autorizada respecto del LSB clásico:
+
+1. **Uso selectivo de canales (Verde y Azul):** Apoyándose en la investigación fisiológica de Hecht citada en el artículo, según la cual cerca del 65% de los conos del ojo humano son sensibles al rojo, el 33% al verde y aproximadamente el 2% al azul, los autores restringen el embebido únicamente a los canales **Verde (G)** y **Azul (B)**, dejando el canal **Rojo (R)** sin alterar para que actúe como ruido o distractor ante un atacante.
+2. **Inversión condicional de bits por patrones:** Luego de realizar una sustitución LSB estándar sobre los bytes útiles (G y B), cada byte portador se clasifica en uno de 4 patrones (`00`, `01`, `10`, `11`) definidos por su **2° y 3° bit menos significativo**. Para cada patrón se contabiliza cuántos bytes modificaron su LSB respecto de la imagen original (*changed*) y cuántos permanecieron iguales (*unchanged*). Si `changed > unchanged`, se invierte el LSB de todos los bytes de ese patrón (asegurando que menos del 50% de los bytes del grupo queden modificados) y se registra el estado de inversión de los patrones.
+
+Aunque la intuición del método se comprende mediante el ejemplo de la Sección 5, **la descripción teórica y los diagramas/pseudocódigos resultan insuficientes para implementar el algoritmo sin recurrir a definiciones externas**, debido a las siguientes omisiones:
+
+- **Ubicación indefinida del mapa de inversión (4 bits):** Tanto en el paso 6 de la Sección 5 (*"Store the status of the patterns that inverse its pixel in specific location"*) como en la Sección 6 (*"Store the status of pattern that inversed his pixels as a map in specific location"*), los autores dejan completamente sin especificar **en qué bytes de la imagen**, en qué orden ni con qué método se almacena el mapa de los 4 patrones. Sin una convención acordada, resulta imposible que un emisor y un receptor independientes interoperen.
+- **Omisión del algoritmo de extracción y detalles de codificación:** La Sección 6 no presenta pseudocódigo de extracción ni define el orden de los bits dentro de cada byte secreto (MSB a LSB o viceversa) ni la forma de determinar la longitud del mensaje oculto. En nuestro trabajo práctico, esto se resolvió siguiendo el formato del enunciado (`[tamaño || datos || extensión\0]`) y grabando los 4 bits de control (`00`, `01`, `10`, `11`) mediante `LSB1` estándar en los primeros 4 bytes consecutivos del cuerpo BMP (`B0, G0, R0, B1`, sin saltear el rojo), comenzando la carga del payload recién a partir del 5° byte (`G1`) sobre canales `B` y `G`.
+- **Pseudocódigo confuso e ineficiente en la Sección 6:** El primer bucle itera por carácter (`For i = 1 to n`), luego `For each 2 bits` y posteriormente `For each colour from green and blue`, mezclando granularidades (un carácter tiene 8 bits, no 2). A continuación, el segundo bloque vuelve a ejecutar `For i = 1 to n` alrededor de la comparación global de patrones, lo cual es conceptualmente erróneo porque el conteo e inversión se evalúan sobre el total de bytes utilizados y no carácter por carácter. Como se documentó en las [notas de implementación de LSBI](https://github.com/jcausse-itba/CRIPTO/blob/main/doc/LSBI_Implementation_Notes.md), una implementación correcta requiere **dos pasadas** de embebido (pudiendo omitirse la segunda si ningún patrón requiere inversión) y **una única pasada** de extracción, leyendo primero el mapa de 4 bits en un arreglo `uint8_t[4]` para aplicar XOR bit a bit sin ramificaciones.
+- **Ausencia de consideraciones sobre el formato BMP y el manejo de *row padding*:** El paper describe el algoritmo sobre una secuencia abstracta de píxeles RGB sin contemplar las particularidades físicas de ningún formato de imagen (y por supuesto tampoco del formato BMP). En el formato BMP V3 de 24 bpp, los canales se almacenan en orden **`BGR`** (de abajo hacia arriba) y las filas se alinean a múltiplos de 4 bytes mediante bytes de *padding* cuando `(width * 3) % 4 != 0`. Si LSBI consumiera los bytes de *padding* dentro del flujo continuo (como sí establecen las pautas del enunciado para `LSB1` y `LSB4`), **el *padding* desalinearía el patrón periódico de salteo por canal (`B, G, R`) en cada salto de fila**. Por este motivo, tal como se registró en las [notas de implementación de LSBI](https://github.com/jcausse-itba/CRIPTO/blob/main/doc/LSBI_Implementation_Notes.md), **luego de conversarlo y acordarlo con la cátedra se tomó la decisión de diseño de no procesar ni considerar imágenes portadoras con *padding* en LSBI**, asumiendo portadoras que cumplen `(width * 3) % 4 == 0` para preservar de manera matemáticamente regular el descarte del canal rojo (`offset % 3 == 2`). Como salvaguarda adicional, `stegobmp` detecta si una portadora posee *padding* y, de poseer, emite un mensaje de nivel `WARN` en el *logger* al ejecutar `LSBI`.
 
 ### 1.3. Claridad de Notación, Errores y Contradicciones
 
