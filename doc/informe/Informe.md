@@ -523,11 +523,15 @@ Dentro del archivo `out.png` (`43.170` bytes) recuperado originalmente desde `bu
 
 *(Apartado VI)*
 
-- **Archivo en el que se empleó:** *Completar.*
+- **Archivo en el que se empleó:** `lifeofpi.bmp` (`1600 × 1000` px, `24` bpp, sin compresión; `4.800.077` bytes en disco).
 - **Descripción del método:**
-  > *Explicar técnicamente en qué consistía el método de esteganografiado alternativo (distinto de `LSB1`, `LSB4` y `LSBI`) y cómo se realizó la recuperación.*
-- **Evaluación de eficacia:**
-  > *Discutir si se trata de un método eficaz y por qué, evaluando su detectabilidad visual/hexadecimal, resistencia frente a análisis estadístico, capacidad de ocultamiento y robustez ante manipulaciones del archivo.*
+  Se utilizó **concatenación directa al final del archivo (*EOF appending* / datos anexados tras el fin de imagen)**. En lugar de insertar bits dentro de los componentes de color de los píxeles, simplemente se escribieron en texto plano ASCII los `23` bytes del mensaje `"la password es aplausos"` (sin terminador `\0`) inmediatamente a continuación del último píxel del BMP.
+  Al inspeccionar sus cabeceras (`BITMAPFILEHEADER` y `BITMAPINFOHEADER`), una imagen de $1600 \times 1000$ a $24$ bpp sin *padding* ocupa exactamente $54 + 1600 \times 1000 \times 3 = 4.800.054$ bytes (valor que coincide con `bfSize = 4.800.054` en la cabecera), mientras que el archivo en disco mide `4.800.077` bytes (y `biSizeImage` figura incrementado en $23$ bytes a `4.800.023`). Como los decodificadores y visores BMP estándar solo leen la grilla de píxeles especificada por ancho y alto (`bfOffBits + 4.800.000`), ignoran por completo esos `23` bytes excedentes al final del archivo. Su recuperación se logró directamente inspeccionando el tramo final con `strings` (y es igualmente inmediata comparando el tamaño en disco contra `bfSize` mediante un editor hexadecimal o `tail -c 23`).
+- **Evaluación de eficacia — ¿Es un método eficaz?**
+  **No, resulta muy poco eficaz** como técnica de esteganografía seria. Si bien presenta dos ventajas superficiales —**imperceptibilidad visual absoluta** ($\text{MSE} = 0$, $\text{PSNR} = \infty$, ya que ningún píxel es alterado y todo análisis sobre planos LSB o histogramas da limpio) y una **capacidad teórica no acotada por las dimensiones de la imagen**—, sus desventajas lo hacen sumamente vulnerable y frágil:
+  1. **Detectabilidad trivial en análisis binario y de cabeceras:** Cualquier verificación básica de integridad del formato detecta de inmediato que el tamaño real del archivo (`4.800.077` B) excede al declarado por `bfSize` (`4.800.054` B) y al tamaño esperado de la matriz de píxeles. Además, al almacenarse en texto plano sin cifrar, herramientas elementales como `strings` o cualquier visor hexadecimal exponen el secreto al instante (de hecho, bastó inspeccionar el tamaño de los archivos y ejecutar `strings | tail` para descubrirlo).
+  2. **Escasa resistencia estadística ante cargas cifradas:** Incluso si el texto agregado se hubiera cifrado previamente, la presencia de bytes excedentes tras el fin lógico de la imagen —sumada a un salto brusco de entropía al final del archivo— seguiría delatando la existencia de información oculta.
+  3. **Nula robustez ante re-procesamiento:** Si la imagen se abre y vuelve a guardarse con cualquier editor, se recorta o se convierte a otro formato (como PNG o JPEG), el software decodificador lee únicamente los $1600 \times 1000$ píxeles válidos y **descarta automáticamente los bytes posteriores a la imagen**, destruyendo el mensaje oculto por completo.
 
 ---
 
