@@ -6,3 +6,5 @@ Quedan en el repositorio casi a modo de documentación y referencia sobre lo inv
 Algunos de estos programas se utilizaron para entender la estructura de los _bitmaps_ y probar cómo manipularlos. Muchas
 de estas pruebas rápidas se hicieron en Python por comodidad, para luego pasarlas a C.
 Luego, los algoritmos aquí desarrollados sirvieron para generar el código real de `stegobmp`.
+
+Además, `stego_analysis.py` fue desarrollado como herramienta auxiliar externa para calcular métricas comparativas (bytes/bits alterados, MSE y PSNR) y generar las visualizaciones del informe.
