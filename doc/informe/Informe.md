@@ -389,7 +389,78 @@ juani@Spectre:~/CRIPTO$ du -h grupo10/lifeofpi.bmp grupo10/silence.bmp
 
 Efectivamente, `silence.bmp` era mucho más pesado. Ese archivo debía contener el video. Ahora bien, intentar esteganografiarlo en el momento hubiera sido una pérdida de tiempo, ya que se sabía que estaba encriptado. Era conveniente empezar por `lifeofpi.bmp`, que se sabía que tenía un método de esteganografiado no estándar.
 
-Para intentar revelar
+Para intentar revelar el contenido oculto en `lifeofpi.bmp`, se extrajeron los strings que contuviera dicho archivo. Como era muy probable que, de estar la información oculta como texto plano, estuviera o al principio o al final, se probó extraer strings utilizando `strings`, filtrando con `head` y `tail`.
+
+```shell
+juani@Spectre:~/CRIPTO$ strings grupo10/lifeofpi.bmp | head -n 3
+BM6>I
+x{wl~zo
+yl~xk{uh|vivpcxreysfxrg~xm}ynrncsqf|zo
+
+juani@Spectre:~/CRIPTO$ strings grupo10/lifeofpi.bmp | tail -n 3
+ct}ar{hy
+}vywpsqknlgjhdgeZ][Y\ZVYWRUSORPKNLHKIGJH>A?=@>;><8;9586253031/20+.,*-+(+)&)'#&$!$"
+la password es aplausos
+```
+
+Al filtrar con `tail`, se extrae que la _password_ es "**aplausos**".
+
+Luego, finalmente, se puede extraer el contenido de `silence.bmp`:
+- Método de esteganografiado: `LSB1`
+- Algoritmo de encripción: `AES-192`
+- Modo: `ECB`
+- Contraseña: `aplausos`
+
+```shell
+juani@Spectre:~/CRIPTO$ ./stegobmp -v -extract -p grupo10/silence.bmp -out out -steg LSB1 -a AES192 -m ECB -pass aplausos
+[  INFO  ] --> Configuration:
+  - embed              : false (default)
+  - in                 : "(null)" (default)
+  - extract            : true (set)
+  - picture            : "grupo10/silence.bmp" (set)
+  - out                : "out" (set)
+  - steg               : "LSB1" (set)
+  - cipher-algorithm   : "AES192" (set)
+  - cipher-mode        : "ECB" (set)
+  - pass               : "aplausos" (set)
+  - verbose            : true (set)
+
+[  INFO  ] --> Starting extract task
+[  INFO  ] --> Bitmap file: "grupo10/silence.bmp"
+[  INFO  ] --> Output base file: "out"
+[  INFO  ] --> Steganography algorithm: LSB1
+[  INFO  ] --> Loaded bitmap (carrier bytes: 27660000, max LSB1 payload capacity: 3457500 bytes)
+[ ERROR  ] --> Failed to decrypt payload using AES192-ECB (wrong password, cipher, or corrupted data)
+[  INFO  ] --> Extract task failed
+```
+
+Ahora bien, con la información proporcionada, la des-encripción falló por contraseña incorrecta. Se le solicitó otro a la cátedra para volver a intentar, y la des-encripción del segundo (`silenceG10.bmp`), utilizando los mismos parámetros, funcionó correctamente.
+
+```shell
+juani@Spectre:~/CRIPTO$ ./stegobmp -v -extract -p grupo10/silenceG10.bmp -out out -steg LSB1 -a AES192 -m ECB -pass aplausos
+[  INFO  ] --> Configuration:
+  - embed              : false (default)
+  - in                 : "(null)" (default)
+  - extract            : true (set)
+  - picture            : "grupo10/silenceG10.bmp" (set)
+  - out                : "out" (set)
+  - steg               : "LSB1" (set)
+  - cipher-algorithm   : "AES192" (set)
+  - cipher-mode        : "ECB" (set)
+  - pass               : "aplausos" (set)
+  - verbose            : true (set)
+
+[  INFO  ] --> Starting extract task
+[  INFO  ] --> Bitmap file: "grupo10/silenceG10.bmp"
+[  INFO  ] --> Output base file: "out"
+[  INFO  ] --> Steganography algorithm: LSB1
+[  INFO  ] --> Loaded bitmap (carrier bytes: 27660000, max LSB1 payload capacity: 3457500 bytes)
+[  INFO  ] --> Extracted payload (total size: 2041773 bytes = 4B size header + 2041764B file data + 5B extension ".wmv\0")
+[  INFO  ] --> Saved extracted file to "out.wmv"
+[  INFO  ] --> Extract task succeeded
+```
+
+Como se ve arriba, se logró obtener el archivo `WMV` oculto. El mismo contiene un fragmento de la película "Wanted" (2008).
 
 ### 3.2. Resultados por Archivo Portador
 
