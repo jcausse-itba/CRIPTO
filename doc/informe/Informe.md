@@ -242,13 +242,67 @@ Para evaluar experimentalmente los tres algoritmos implementados, se ocultó un 
 
 ## 3. Estegoanálisis de los Archivos Provistos
 
-*Resolución del estegoanálisis sobre los 4 archivos provistos al Grupo 10 (`budapest.bmp`, `lifeofpi.bmp`, `madrid.bmp` y `silence.bmp`) — Sección 6 del Enunciado y Apartados III a VI.*
+*Resolución del estegoanálisis sobre los 5 archivos provistos al Grupo 10 (`budapest.bmp`, `lifeofpi.bmp`, `madrid.bmp`, `silence.bmp` y `silenceG10.bmp`) — Sección 6 del Enunciado y Apartados III a VI.*
+
+> **Nota:** Cabe aclarar que el archivo `silenceG10.bmp` fue provisto posteriormente, debido a un error de des-encripción del original, `silence.bmp`.
+
+> **Nota:** Debido al tamaño de las imágenes provistas por la cátedra, las mismas no fueron subidas al repositorio, pero se las referencia en este informe con los mismos nombres provistos, para evitar confusión.
 
 ### 3.1. Metodología y Procedimiento de Descubrimiento
 
 *(Apartado III)*
 
-> *Explicar detalladamente la metodología general empleada para analizar las portadoras: inspección de encabezados BMP (tamaño real vs. `bfSize`/`biSizeImage`), búsqueda de cadenas legibles (`strings`), inspección en editores hexadecimales, análisis visual/planos de bits, evaluación estadística de patrones LSB y pruebas de extracción/descifrado mediante `stegobmp`.*
+> **Nota:** En el presente apartado, se describe paso a paso el procedimiento mediante el cual se realizó el proceso de descubrimiento sobre los archivos provistos, para luego en el apartado [3.2.](#32-resultados-por-archivo-portador) proveer solamente los resultados de forma breve.
+
+Primeramente, se realizó un análisis puramente visual de los archivos provistos. Como el enunciado explicitaba el uso de `LSB4` para uno de los _bitmaps_ provistos, el primero que se buscó fue este. La razón es simple: en nuestras pruebas preliminares (como en [`images/cat_README_LSB4.bmp`](https://raw.githubusercontent.com/jcausse-itba/CRIPTO/refs/heads/main/images/cat_README_LSB4.bmp)) los archivos esteganografiados mediante `LSB4` presentan gran ruido agregado sobre la imagen en la porción donde se encuentra oculto el archivo embebido.
+
+<p align="center">
+  <img src="./05_cat_README_LSB4_noise.png" alt="Artefacto visual en images/cat_README_LSB4.bmp" width="580" />
+  <br>
+  <em>Inspección visual sobre <code>images/cat_README_LSB4.bmp</code> mostrando la alteración perceptible introducida por <code>LSB4</code>.</em>
+</p>
+
+Teniendo en cuenta esta experiencia previa, resultó natural buscar patrones similares en las imágenes provistas. De esta forma, se encontró el siguiente patrón de ruido muy similar al anterior, en la imagen `budapest.bmp`:
+
+<p align="center">
+  <img src="./06_budapest_lsb4_artefacto.png" alt="Artefacto visual en budapest.bmp" width="580" />
+  <br>
+  <em>Inspección visual sobre <code>budapest.bmp</code> mostrando la alteración perceptible introducida por <code>LSB4</code>.</em>
+</p>
+
+Entonces, intuyendo que se trataba del archivo esteganografiado con `LSB4`, se procedió a intentar extraer el archivo embebido utilizando `stegobmp`: 
+
+```shell
+juani@Spectre:~/CRIPTO$ ./stegobmp -v -extract -p grupo10/budapest.bmp -out out -steg LSB4
+[  INFO  ] --> Configuration:
+  - embed              : false (default)
+  - in                 : "(null)" (default)
+  - extract            : true (set)
+  - picture            : "grupo10/budapest.bmp" (set)
+  - out                : "out" (set)
+  - steg               : "LSB4" (set)
+  - cipher-algorithm   : "AES128" (default)
+  - cipher-mode        : "CBC" (default)
+  - pass               : "" (default)
+  - verbose            : true (set)
+
+[  INFO  ] --> Starting extract task
+[  INFO  ] --> Bitmap file: "grupo10/budapest.bmp"
+[  INFO  ] --> Output base file: "out"
+[  INFO  ] --> Steganography algorithm: LSB4
+[  INFO  ] --> Loaded bitmap (carrier bytes: 6220800, max LSB4 payload capacity: 3110400 bytes)
+[  INFO  ] --> Extracted payload (total size: 43179 bytes = 4B size header + 43170B file data + 5B extension ".png\0")
+[  INFO  ] --> Saved extracted file to "out.png"
+[  INFO  ] --> Extract task succeeded
+```
+
+Tras el éxito en la extracción, el programa produjo `out.bmp` (el nombre del archivo fue asignado de manera arbitraria, pero su extensión se encontraba dentro del esteganografiado), una imagen del famoso juego "Buscaminas".
+
+<p align="center">
+  <img src="./07_budapest_buscaminas.png" alt="Imagen Buscaminas extraída de budapest.bmp" width="380" />
+  <br>
+  <em>Archivo <code>out.png</code> recuperado de <code>budapest.bmp</code> (captura del juego "Buscaminas").</em>
+</p>
 
 ### 3.2. Resultados por Archivo Portador
 
@@ -273,21 +327,7 @@ Para evaluar experimentalmente los tres algoritmos implementados, se ocultó un 
 - **Contenido extraído:** Archivo `.png` con una imagen del juego "Buscaminas".
 - **Procedimiento aplicado:**
   > *Completar detallando los pasos de detección (por ejemplo, identificación de artefactos visuales en los 4 LSB superiores de la imagen) y el comando de extracción ejecutado:*
-  ```shell
-  ./stegobmp -extract -p grupo10/budapest.bmp -out <salida> -steg LSB4 ...
-  ```
 
-<p align="center">
-  <img src="./budapest_lsb4_artefacto.png" alt="Artefacto visual en budapest.bmp" width="580" />
-  <br>
-  <em>Inspección visual sobre <code>budapest.bmp</code> mostrando la alteración perceptible introducida por <code>LSB4</code>.</em>
-</p>
-
-<p align="center">
-  <img src="./budapest_buscaminas.png" alt="Imagen Buscaminas extraída de budapest.bmp" width="380" />
-  <br>
-  <em>Archivo <code>.png</code> recuperado de <code>budapest.bmp</code> (captura del juego "Buscaminas").</em>
-</p>
 
 ---
 
