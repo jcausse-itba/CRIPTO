@@ -482,13 +482,25 @@ A continuación se resumen los hallazgos obtenidos tras el estegoanálisis de la
 
 *(Apartado IV)*
 
-> *Describir los mensajes ocultos secundarios hallados dentro de alguno(s) de los archivos extraídos, indicando en cada caso cuál era el mensaje y mediante qué técnica o herramienta había sido ocultado.*
+Dentro del archivo `out.png` (`43.170` bytes) recuperado originalmente desde `budapest.bmp`, se identificaron **dos mensajes ocultos anidados** en distintos niveles: uno mediante manipulación de formato de archivo y otro codificado visualmente dentro del propio contenido de la imagen.
 
-- **Archivo contenedor de origen:** *Completar.*
-- **Mensaje secundario descubierto:** *Completar.*
-- **Método de ocultamiento utilizado:** *Completar (detallar técnica y procedimiento de extracción).*
+1. **Archivo ZIP concatenado al final de `out.png` (archivo políglota `PNG + ZIP`):**
+   - **Archivo contenedor de origen:** `out.png` (`43.170` bytes), extraído mediante `LSB4` de `budapest.bmp`.
+   - **Mensaje secundario descubierto:** El archivo `sol10.txt` (`260` bytes sin comprimir; `173` bytes comprimidos con *Deflate*), que contenía las instrucciones clave para continuar la cadena de estegoanálisis:
+     ```text
+     cada mina es un 1.
+     cada fila forma una letra.
+     Los ascii de las letras empiezan todos en 01.
+     Asi encontraras el algoritmo que tiene clave de 192 bits y el modo
+     La password esta en otro archivo
+     Con algoritmo, modo y password hay un .wmv encriptado y oculto.
+     ```
+   - **Método de ocultamiento utilizado:** **Concatenación al final del archivo (*EOF appending*) aprovechando formatos compatibles (*archivo políglota*)**. Al inspeccionar la estructura binaria de `out.png`, la imagen PNG válida finaliza exactamente en su *chunk* marcador `IEND` (en el *offset* `42.829`), e inmediatamente a continuación (cabecera `PK\x03\x04` entre los bytes `42.829` y `43.170`) se anexó un archivo `.zip` completo de `341` bytes. Como los decodificadores PNG dejan de leer al alcanzar `IEND` e ignoran los bytes posteriores, mientras que los descompresores ZIP localizan el *End of Central Directory* leyendo desde el final del archivo (tolerando bytes previos como un *warning*), el archivo resulta válido simultáneamente como `.png` y como `.zip`. Su extracción se realizó simplemente renombrándolo a `.zip` y ejecutando `unzip` (guiados por la pista del `.pdf` oculto en `madrid.bmp`).
 
-<!-- Espacio para captura de evidencia (repetir bloques si hubiera más de un mensaje anidado) -->
+2. **Parámetros criptográficos codificados en el tablero de "Buscaminas":**
+   - **Archivo contenedor de origen:** La captura visual del juego *Buscaminas* presente en `out.png`.
+   - **Mensaje secundario descubierto:** La cadena **`AesEcb`**, que combinada con la aclaración de *"clave de 192 bits"* de `sol10.txt` indicaba los parámetros de cifrado **`AES-192` en modo `ECB`** del video oculto en `silenceG10.bmp`.
+   - **Método de ocultamiento utilizado:** **Codificación binaria visual sobre la disposición lógica de un tablero de $6 \times 6$ casillas**, combinada con un acertijo previo de resolución obligatoria. Cada fila de $6$ celdas codifica los $6$ bits menos significativos de un carácter _ASCII_ (`mina = 1`, `otra cosa = 0`), anteponiendo el prefijo binario `01` especificado en `sol10.txt` para completar el byte. Dado que el tablero original mostraba $12$ minas marcadas y aún faltaban $3$ por descubrir (como indicaba el contador superior izquierdo), fue necesario deducir primero su ubicación unívoca (columna $6$ de la fila $2$ y columna $1$ de las filas $5$ y $6$, según se ilustró en la sección [3.1](#31-metodología-y-procedimiento-de-descubrimiento)) para reconstruir la secuencia `[0x41, 0x65, 0x73, 0x45, 0x63, 0x62]` $\rightarrow$ `'AesEcb'`.
 
 ### 3.4. Análisis de la Escena de Video / Película
 
