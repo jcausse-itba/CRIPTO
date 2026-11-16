@@ -150,37 +150,97 @@ A modo de conclusión, la gran redundancia presente en las explicaciones de este
 
 ### 2.1. Ocultamiento de Prueba y Comparación de Resultados
 
-> *Describir la experiencia realizada al esteganografiar un mismo archivo secreto en una misma imagen portadora `.bmp` utilizando `LSB1`, `LSB4` y `LSBI`, comparando los resultados obtenidos.*
+Para evaluar experimentalmente los tres algoritmos implementados, se ocultó un mismo archivo de prueba —el documento [`README.md`](../../README.md) del repositorio, de **`12.735` bytes** (`12.743` bytes totales en flujo esteganográfico considerando los `4` bytes del tamaño en *Big-Endian* y los `4` bytes de la extensión `.md\0`, equivalentes a `101.944` bits)— dentro de dos portadoras BMP V3 de 24 bpp sin compresión y sin *row padding*:
 
-- **Imagen portadora utilizada:** *Completar (nombre, resolución, tamaño en bytes).*
-- **Archivo secreto utilizado:** *Completar (nombre, extensión, tamaño en bytes).*
+<div align="center">
+  <table style="border: none; border-collapse: collapse; margin: 0 auto;">
+    <tr>
+      <td align="center" style="border: none; padding: 8px 20px;">
+        <img src="./cat_thumb.jpg" alt="cat_v3.bmp" width="185" />
+        <br>
+        <code>images/cat_v3.bmp</code><br>
+        <sub>700 × 700 px · 24 bpp · 1.470.054 B</sub>
+      </td>
+      <td align="center" style="border: none; padding: 8px 20px;">
+        <img src="./eiffel_tower_thumb.jpg" alt="eiffel_tower_v3.bmp" width="185" />
+        <br>
+        <code>images/eiffel_tower_v3.bmp</code><br>
+        <sub>800 × 800 px · 24 bpp · 1.920.054 B</sub>
+      </td>
+    </tr>
+  </table>
+</div>
+
 - **Comandos ejecutados:**
   ```shell
-  # LSB1
-  ./stegobmp -embed -in <archivo> -p <portador.bmp> -out <salida_lsb1.bmp> -steg LSB1
-
-  # LSB4
-  ./stegobmp -embed -in <archivo> -p <portador.bmp> -out <salida_lsb4.bmp> -steg LSB4
-
-  # LSBI
-  ./stegobmp -embed -in <archivo> -p <portador.bmp> -out <salida_lsbi.bmp> -steg LSBI
+  juani@VoidX:/data/Repos/CRIPTO$ ./stegobmp -embed -in README.md -p images/cat_v3.bmp -out images/cat_README_LSB1.bmp -steg LSB1
+  [  INFO  ] --> Starting embed task
+  [  INFO  ] --> Saved output bitmap to "images/cat_README_LSB1.bmp"
+  [  INFO  ] --> Embed task succeeded
+  juani@VoidX:/data/Repos/CRIPTO$ ./stegobmp -embed -in README.md -p images/cat_v3.bmp -out images/cat_README_LSB4.bmp -steg LSB4
+  [  INFO  ] --> Starting embed task
+  [  INFO  ] --> Saved output bitmap to "images/cat_README_LSB4.bmp"
+  [  INFO  ] --> Embed task succeeded
+  juani@VoidX:/data/Repos/CRIPTO$ ./stegobmp -embed -in README.md -p images/cat_v3.bmp -out images/cat_README_LSBI.bmp -steg LSBI
+  [  INFO  ] --> Starting embed task
+  [  INFO  ] --> Saved output bitmap to "images/cat_README_LSBI.bmp"
+  [  INFO  ] --> Embed task succeeded
+  juani@VoidX:/data/Repos/CRIPTO$ ./stegobmp -embed -in README.md -p images/eiffel_tower_v3.bmp -out images/eiffel_tower_README_LSBI.bmp -steg LSBI
+  [  INFO  ] --> Starting embed task
+  [  INFO  ] --> Saved output bitmap to "images/eiffel_tower_README_LSBI.bmp"
+  [  INFO  ] --> Embed task succeeded
+  juani@VoidX:/data/Repos/CRIPTO$ ./stegobmp -embed -in README.md -p images/eiffel_tower_v3.bmp -out images/eiffel_tower_README_LSB1.bmp -steg LSB1
+  [  INFO  ] --> Starting embed task
+  [  INFO  ] --> Saved output bitmap to "images/eiffel_tower_README_LSB1.bmp"
+  [  INFO  ] --> Embed task succeeded
+  juani@VoidX:/data/Repos/CRIPTO$ ./stegobmp -embed -in README.md -p images/eiffel_tower_v3.bmp -out images/eiffel_tower_README_LSB4.bmp -steg LSB4
+  [  INFO  ] --> Starting embed task
+  [  INFO  ] --> Saved output bitmap to "images/eiffel_tower_README_LSB4.bmp"
+  [  INFO  ] --> Embed task succeeded
   ```
-- **Resultados y comparación observada:**
-  > *Completar analizando la capacidad máxima de cada método, cantidad de bytes portadores alterados, diferencia visual directa, distorsión en bits/histogramas o métricas como PSNR/MSE.*
 
-<!-- Espacio para capturas comparativas (por ejemplo, imágenes resultantes o histogramas):
+- **Métricas cuantitativas obtenidas:**
+  Mediante el analizador en Python implementado en `external-utilities/stego_analysis.py` (comparando byte a byte las portadoras originales frente a las 6 salidas generadas por `stegobmp`), se midieron las siguientes métricas de capacidad, alteración por canal, error cuadrático medio (**MSE**) y relación señal-ruido pico (**PSNR**):
+
+| Portadora | Algoritmo | Cap. Máxima | Bytes Modificados (%) | Bits Mod. | Canales Modificados (B / G / R) | Δ Máx | MSE | PSNR (dB) |
+| :--- | :---: | ---: | ---: | ---: | :---: | :---: | ---: | ---: |
+| `cat_v3.bmp` | **LSB1** | 183.750 B | 51.054 (3,47%) | 51.054 | 17.123 / 17.057 / 16.874 | 1 | 0,0347 | 62,72 dB |
+| `cat_v3.bmp` | **LSB4** | 735.000 B | 23.910 (1,63%) | 51.106 | 7.981 / 7.969 / 7.960 | 15 | 0,7220 | 49,55 dB |
+| `cat_v3.bmp` | **LSBI** | 122.499 B | 50.513 (3,44%) | 50.513 | 25.267 / 25.246 / **0** | 1 | 0,0344 | **62,77 dB** |
+| `eiffel_tower_v3.bmp` | **LSB1** | 240.000 B | 50.975 (2,65%) | 50.975 | 16.866 / 17.037 / 17.072 | 1 | 0,0265 | 63,89 dB |
+| `eiffel_tower_v3.bmp` | **LSB4** | 960.000 B | 23.946 (1,25%) | 51.565 | 7.848 / 8.146 / 7.952 | 15 | 0,5263 | 50,92 dB |
+| `eiffel_tower_v3.bmp` | **LSBI** | 159.999 B | 50.803 (2,65%) | 50.803 | 25.228 / 25.575 / **0** | 1 | 0,0265 | **63,90 dB** |
+
 <p align="center">
-  <img src="./comparacion_lsb.png" alt="Comparación visual LSB1 vs LSB4 vs LSBI" width="600" />
+  <img src="./comparacion_metricas.png" alt="Gráfico comparativo de PSNR y bytes modificados por canal" width="660" />
+  <br>
+  <em>Comparación de fidelidad visual (PSNR en dB) y distribución de bytes modificados por canal en <code>cat_v3.bmp</code>.</em>
 </p>
--->
+
+<p align="center">
+  <img src="./comparacion_mapa_cambios.png" alt="Mapa espacial de píxeles alterados en cat_v3.bmp" width="660" />
+  <br>
+  <em>Mapa espacial de píxeles modificados sobre <code>cat_v3.bmp</code> (atenuada): alcance en filas desde la base inferior de la imagen y canales afectados.</em>
+</p>
+
+<p align="center">
+  <img src="./comparacion_planos_bits.png" alt="Comparación de planos de bits 4-LSB y 1-LSB" width="660" />
+  <br>
+  <em>Comparación de planos de bits inferiores en la franja inferior (270×90 px): huella del bloque <code>LSB4</code> en el plano 4-LSB y preservación del canal Rojo en el plano 1-LSB de <code>LSBI</code>.</em>
+</p>
+
+- **Análisis e interpretación de los resultados:**
+  1. **Capacidad vs. distorsión cuadrática (`LSB4` frente a `LSB1` y `LSBI`):** `LSB4` cuadruplica la capacidad respecto de `LSB1` (`735.000 B` vs. `183.750 B` en `cat_v3.bmp`) y modifica menos de la mitad de bytes (`1,63%` vs. `3,47%`) concentrándose en apenas `13` filas inferiores (`1,9%` de la altura). Sin embargo, al alterar los 4 bits menos significativos de cada componente, cada byte modificado puede desviarse hasta `±15` niveles de intensidad (`Δ máx = 15`), multiplicando el **MSE por ~20 veces** y provocando una caída severa de **~13 dB en el PSNR** (`49,55 dB` en `cat` y `50,92 dB` en `eiffel`). Al inspeccionar el plano `4-LSB`, el bloque embebido produce una banda de ruido claramente discernible frente al resto de la fotografía.
+  2. **Mayor fidelidad de `LSBI` frente a `LSB1`:** Tanto `LSB1` como `LSBI` limitan la perturbación por byte a `Δ máx = 1`, logrando valores de PSNR superiores a `62 dB` totalmente imperceptibles para el ojo humano. Aun así, en ambas imágenes **`LSBI` logró modificar menos bytes totales que `LSB1`** (`50.513` vs. `51.054` en `cat_v3.bmp`; `50.803` vs. `50.975` en `eiffel_tower_v3.bmp`) gracias a la inversión condicional por patrones, obteniendo el mayor PSNR de la comparativa (`62,77 dB` y `63,90 dB`).
+  3. **Huella espacial y aislamiento del canal Rojo en `LSBI`:** Al descartar el canal Rojo (1 de cada 3 bytes), `LSBI` reduce su capacidad máxima a ~2/3 de la de `LSB1` (`122.499 B` vs. `183.750 B` en `cat_v3.bmp`) y extiende el mensaje sobre una mayor altura vertical (`73` filas = `10,4%`, frente a `49` filas = `7,0%` en `LSB1`). Como contrapartida, **los cambios en el canal Rojo son exactamente `0`**, por lo que un extractor o analizador que inspeccione el plano LSB del canal Rojo observa la textura original completamente inalterada.
 
 ### 2.2. Cuadro Comparativo de Ventajas y Desventajas
 
 | Algoritmo | Capacidad de Carga | Alteración Visual / Histogramas | Resistencia a Estegoanálisis | Complejidad / Pasadas | Ventajas Principales | Desventajas / Limitaciones |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **LSB1** | *Completar* | *Completar* | *Completar* | *Completar* | *Completar* | *Completar* |
-| **LSB4** | *Completar* | *Completar* | *Completar* | *Completar* | *Completar* | *Completar* |
-| **LSBI** | *Completar* | *Completar* | *Completar* | *Completar* | *Completar* | *Completar* |
+| **LSB1** | Media (`1/8` del total de bytes = `3 bits/píxel`). | Muy baja (`Δ máx = 1`; PSNR `~62,7–63,9 dB` en las pruebas). | Baja: los 3 canales se alteran de forma uniforme; una lectura directa de LSB expone el tamaño y el payload secuencial. | Muy simple: **1 pasada** tanto para embeber como para extraer; acepta *row padding* contiguo. | Sencillez de implementación, buen equilibrio entre capacidad y alta imperceptibilidad visual. | Predecible para herramientas de extracción automática y vulnerable a inspección de planos LSB en cualquiera de los 3 canales. |
+| **LSB4** | Muy alta (`1/2` del total de bytes = `12 bits/píxel`, `4×` más que `LSB1`). | Media/Alta (`Δ máx = 15`; PSNR cae a `~49,5–50,9 dB`). Genera artefactos visibles en zonas uniformes y alteración notoria en planos `4-LSB`. | Muy baja: deja un corte abrupto fácilmente detectable en los 4 bits menos significativos e incluso a simple vista con zoom sobre tonos lisos. | Simple: **1 pasada** (2 nibbles por byte secreto); acepta *row padding* contiguo. | Permite ocultar archivos muy grandes en portadoras relativamente pequeñas y requiere menos bytes tocados para un mismo mensaje. | Degradación notable de la imagen (MSE alto, menor PSNR) y alta detectabilidad visual y en análisis de planos de bits. |
+| **LSBI** | Moderada (`~2/3` de `LSB1`, unos `2 bits/píxel` menos `4 bits` de mapa). | Mínima (`Δ máx = 1`; mejor PSNR observado: `~62,8–63,9 dB`). El canal Rojo permanece intacto, reduciendo el impacto perceptual. | Alta frente a métodos simples: el canal Rojo actúa como ruido/distractor y la inversión por patrones limita las alteraciones por grupo a `< 50%`, impidiendo lectura LSB directa sin conocer el mapa. | Mayor: **2 pasadas** en embebido (2ª omitible si no hay inversión) y **1 pasada** con arreglo XOR en extracción. Requiere portadoras sin *row padding*. | Máxima fidelidad (PSNR), menor cantidad de bytes modificados y doble capa de dificultad (omisión del canal Rojo + inversión condicional). | Menor capacidad máxima (`-33%` frente a `LSB1`), mayor huella espacial en filas utilizadas y no soporta imágenes BMP con *padding* entre filas. |
 
 ---
 
