@@ -296,13 +296,100 @@ juani@Spectre:~/CRIPTO$ ./stegobmp -v -extract -p grupo10/budapest.bmp -out out 
 [  INFO  ] --> Extract task succeeded
 ```
 
-Tras el éxito en la extracción, el programa produjo `out.bmp` (el nombre del archivo fue asignado de manera arbitraria, pero su extensión se encontraba dentro del esteganografiado), una imagen del famoso juego "Buscaminas".
+Tras el éxito en la extracción, el programa produjo `out.bmp` (el nombre del archivo fue asignado de manera arbitraria, pero su extensión se encontraba dentro del secreto oculto en la imagen), una imagen del famoso juego "Buscaminas".
 
 <p align="center">
-  <img src="./07_budapest_buscaminas.png" alt="Imagen Buscaminas extraída de budapest.bmp" width="380" />
+  <img src="./07_budapest_buscaminas.png" alt="Imagen Buscaminas extraída de budapest.bmp" width="480" />
   <br>
   <em>Archivo <code>out.png</code> recuperado de <code>budapest.bmp</code> (captura del juego "Buscaminas").</em>
 </p>
+
+Luego, se procedió a esteganografiar los otros archivos (`lifeofpi.bmp`, `madrid.bmp` y `silence.bmp`), sabiendo que uno de ellos debía ser el que corresponde a `LSB1`, otro a `LSBI`, y otro el que tiene el secreto oculto mediante un método de estenografiado no estándar.
+
+Se intentó primero con `LSBI` sin encripción:
+
+```shell
+juani@Spectre:~/CRIPTO$ ./stegobmp -extract -out out -steg LSBI -p grupo10/lifeofpi.bmp 
+[  INFO  ] --> Starting extract task
+[ ERROR  ] --> Invalid extracted payload size (3192996693 bytes) exceeds maximum carrier capacity for LSBI (399999 bytes)
+[  INFO  ] --> Extract task failed
+juani@Spectre:~/CRIPTO$ ./stegobmp -extract -out out -steg LSBI -p grupo10/silence.bmp 
+[  INFO  ] --> Starting extract task
+[ ERROR  ] --> Invalid extracted payload size (123536704 bytes) exceeds maximum carrier capacity for LSBI (2304999 bytes)
+[  INFO  ] --> Extract task failed
+juani@Spectre:~/CRIPTO$ ./stegobmp -extract -out out -steg LSBI -p grupo10/madrid.bmp 
+[  INFO  ] --> Starting extract task
+[  INFO  ] --> Saved extracted file to "out.pdf"
+[  INFO  ] --> Extract task succeeded
+```
+
+Como se puede ver, la extracción `LSBI` falló para `lifeofpi.bmp` y para `silence.bmp`, pero fue exitosa para `madrid.bmp`. 
+
+Los errores para los primeros dos archivos son esperables, ya que el programa primero extrae los primeros 4 bytes _big-endian_ que indican el tamaño del archivo embebido. El error que se muestra indica que al extraer esos 4 bytes e interpretarlos _big-endian_, el tamaño declarado para el archivo embebido supera la capacidad máxima de la portadora para `LSBI`. Si dichos archivos realmente tuvieran un _payload_ esteganografiado por `LSBI`, este error no debería ocurrir, por lo que se deduce que no son `LSBI`.
+
+La imagen `madrid.bmp` pudo ser extraída correctamente con `LSBI`, dando como resultado un archivo _PDF_ con el siguiente contenido:
+
+> al .png cambiarle la extension por .zip y descomprimir
+
+Luego, naturalmente, se procedió a hacerle caso a las instrucciones del `PDF`, entendiendo por `.png` a la imagen del "Buscaminas" anteriormente encontrada. Como resultado, se obtuvo un archivo de texto `sol10.txt`.
+
+```shell
+# Cambiar la extensión a .zip.
+juani@Spectre:~/CRIPTO$ mv out.png out.zip
+
+# Extraer. Produce un warning pero se ignora.
+juani@Spectre:~/CRIPTO$ unzip out.zip
+Archive:  out.zip
+warning [out.zip]:  42829 extra bytes at beginning or within zipfile
+  (attempting to process anyway)
+  inflating: sol10.txt               
+
+# Mostrar el archivo extraído.
+juani@Spectre:~/CRIPTO$ cat sol10.txt
+cada mina es un 1.
+cada fila forma una letra.
+Los ascii de las letras empiezan todos en 01.
+Asi encontraras el algoritmo que tiene clave de 192 bits y el modo
+La password esta en otro archivo
+Con algoritmo, modo y password hay un .wmv encriptado y oculto.
+```
+
+El texto del archivo `sol10.txt` indicaba que había un mensaje oculto en el tablero del "Buscaminas", un carácter _ASCII_ por fila, donde en cada fila la posición de las minas representaba un `1` y el resto de las posiciones un `0`. Como cada fila tiene 6 columnas, precediendo `01` a cada fila (como indica la pista) se obtienen 6 tiras de 8 bits, que pueden interpretarse como 6 carácteres _ASCII_ de 8 bits cada uno.
+
+Como en la captura del "Buscaminas" se indica que quedan 3 minas por marcar, primero se procedió a terminar el juego. Se marcaron con una cruz roja las 3 posiciones restanes con minas, y luego se interpretó cada casilla del tablero. El resultado fue el siguiente:
+
+<p align="center">
+  <img src="./08_buscaminas_resuelto.png" alt="Acertijo del Buscaminas ya resuelto" width="480" />
+  <br>
+  <em>Resolución del juego "Buscaminas" y traducción a bits según <code>sol10.txt</code>.</em>
+</p>
+
+En hexadecimal, los bytes formados son (por filas, de arriba hacia abajo): `[0x41, 0x65, 0x73, 0x45, 0x63, 0x62]`. Utilizando _Python_ en modo consola, es sencillo convertir estos bytes _ASCII_ en un _string_ de forma rápida, dando por resultado `'AesEcb'`.
+
+```python
+>>> "".join([chr(b) for b in [0x41, 0x65, 0x73, 0x45, 0x63, 0x62]])
+'AesEcb'
+```
+
+Luego de resolver este acertijo, y considerando también la información proporcionada por `sol10.txt` se dedujo que alguno de los restantes dos archivos (`lifeofpi.bmp` o `silence.bmp`):
+- Contenía un video en formato `WMV`.
+- Estaba encriptado utilizando `AES-192` en modo `ECB`.
+- Utilizaba esteganografiado `LSB1` (esto se supo por eliminación, ya que el enunciado advertía que había uno con cada algoritmo de esteganografiado soportado por `stegobmp`; el único que quedaba sin utilizar era `LSB1`; y era muy probable que, si el archivo estaba encriptado, utilice un modo de esteganografiado estándar ya que debía ser esteganografiado con nuestro propio programa).
+- La _password_ era desconocida.
+
+Por eliminación, también se supo que el otro de estos dos archivos restantes debía ser aquel que esté esteganografiado de forma no estándar, y que debía contener la _password_ faltante para el archivo encriptado.
+
+Se observó el tamaño de los dos archivos utilizando `du`, esperando que haya una asimetría entre ellos: uno debía ser más pesado (y el _bitmap_ más grande), ya que debía contener un video embebido.
+
+```shell
+juani@Spectre:~/CRIPTO$ du -h grupo10/lifeofpi.bmp grupo10/silence.bmp 
+4.6M    grupo10/lifeofpi.bmp
+27M     grupo10/silence.bmp
+```
+
+Efectivamente, `silence.bmp` era mucho más pesado. Ese archivo debía contener el video. Ahora bien, intentar esteganografiarlo en el momento hubiera sido una pérdida de tiempo, ya que se sabía que estaba encriptado. Era conveniente empezar por `lifeofpi.bmp`, que se sabía que tenía un método de esteganografiado no estándar.
+
+Para intentar revelar
 
 ### 3.2. Resultados por Archivo Portador
 
