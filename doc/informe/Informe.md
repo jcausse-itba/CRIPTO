@@ -2,7 +2,7 @@
 
 <br>
 
-<img src="./itba_logo.png" alt="Logo ITBA" width="260" />
+<img src="./00_itba_logo.png" alt="Logo ITBA" width="260" />
 
 <br><br>
 
@@ -156,13 +156,13 @@ Para evaluar experimentalmente los tres algoritmos implementados, se ocultó un 
   <table style="border: none; border-collapse: collapse; margin: 0 auto;">
     <tr>
       <td align="center" style="border: none; padding: 8px 20px;">
-        <img src="./cat_thumb.jpg" alt="cat_v3.bmp" width="185" />
+        <img src="./01_cat_thumb.jpg" alt="cat_v3.bmp" width="185" />
         <br>
         <code>images/cat_v3.bmp</code><br>
         <sub>700 × 700 px · 24 bpp · 1.470.054 B</sub>
       </td>
       <td align="center" style="border: none; padding: 8px 20px;">
-        <img src="./eiffel_tower_thumb.jpg" alt="eiffel_tower_v3.bmp" width="185" />
+        <img src="./02_eiffel_tower_thumb.jpg" alt="eiffel_tower_v3.bmp" width="185" />
         <br>
         <code>images/eiffel_tower_v3.bmp</code><br>
         <sub>800 × 800 px · 24 bpp · 1.920.054 B</sub>
@@ -212,13 +212,13 @@ Para evaluar experimentalmente los tres algoritmos implementados, se ocultó un 
 | `eiffel_tower_v3.bmp` | **LSBI** | 159.999 B | 50.803 (2,65%) | 50.803 | 25.228 / 25.575 / **0** | 1 | 0,0265 | **63,90 dB** |
 
 <p align="center">
-  <img src="./comparacion_metricas.png" alt="Gráfico comparativo de PSNR y bytes modificados por canal" width="660" />
+  <img src="./03_comparacion_metricas.png" alt="Gráfico comparativo de PSNR y bytes modificados por canal" width="660" />
   <br>
   <em>Comparación de fidelidad visual (PSNR en dB) y distribución de bytes modificados por canal en <code>cat_v3.bmp</code>.</em>
 </p>
 
 <p align="center">
-  <img src="./comparacion_mapa_cambios.png" alt="Mapa espacial de píxeles alterados en cat_v3.bmp" width="660" />
+  <img src="./04_comparacion_mapa_cambios.png" alt="Mapa espacial de píxeles alterados en cat_v3.bmp" width="660" />
   <br>
   <em>Mapa espacial de píxeles modificados sobre <code>cat_v3.bmp</code> (atenuada): alcance en filas desde la base inferior de la imagen y canales afectados.</em>
 </p>
