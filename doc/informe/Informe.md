@@ -87,7 +87,7 @@ El artículo presenta la estructura habitual de una publicación científica: un
    El método propuesto se divide en *5. The Proposed Bit Inversion Technique* (pp. 344–345, enumeración de pasos y ejemplo numérico) y *6. The Proposed Bit Inversion Algorithm* (pp. 345–346, pseudocódigo). Ambas secciones describen el mismo algoritmo de inserción y resultarían mucho más claras unificadas en una sola sección metodológica que incluya, además, **el algoritmo formal de extracción (*de-steganography*)**, el cual carece de pseudocódigo y apenas se describe en prosa al final de la Sección 5.
 4. **Sección experimental y conclusiones (Secciones 7 y 8):**
    La Sección 7 (*Simulation Result*, pp. 346–347) expone imágenes de prueba, histogramas comparativos (Figs. 3–5) y tablas de PSNR frente a tres trabajos previos de la literatura, pero carece de pruebas estadísticas de estegoanálisis que validen cuantitativamente la resistencia frente a detección. Además, la Sección 8 (*Discussion and Conclusion*, pp. 347–348) reproduce prácticamente las mismas afirmaciones del *Abstract* sin mayor agregado de valor.
-5. **Errores editoriales, tipográficas y bibliográficas:**
+5. **Errores editoriales, tipográficos y bibliográficos:**
    El _paper_ exhibe algunas fallas de revisión:
    - El título de la bibliografía está mal escrito como **`REFRENCES`** (p. 348).
    - Errores gramaticales y de tipeo recurrentes en inglés (*"less numbers of pixels"*, *"a steg-image"*, *"In In steganography"*, *"the lest significant bit"*, *"this this proposed method"*).
@@ -110,7 +110,7 @@ Aunque la intuición del método se comprende mediante el ejemplo de la Sección
 - **Ubicación indefinida del mapa de inversión (4 bits):** Tanto en el paso 6 de la Sección 5 (*"Store the status of the patterns that inverse its pixel in specific location"*) como en la Sección 6 (*"Store the status of pattern that inversed his pixels as a map in specific location"*), los autores dejan completamente sin especificar **en qué bytes de la imagen**, en qué orden ni con qué método se almacena el mapa de los 4 patrones. Sin una convención acordada, resulta imposible que un emisor y un receptor independientes interoperen.
 - **Omisión del algoritmo de extracción y detalles de codificación:** La Sección 6 no presenta pseudocódigo de extracción ni define el orden de los bits dentro de cada byte secreto (MSB a LSB o viceversa) ni la forma de determinar la longitud del mensaje oculto. En nuestro trabajo práctico, esto se resolvió siguiendo el formato del enunciado (`[tamaño || datos || extensión\0]`) y grabando los 4 bits de control (`00`, `01`, `10`, `11`) mediante `LSB1` estándar en los primeros 4 bytes consecutivos del cuerpo BMP (`B0, G0, R0, B1`, sin saltear el rojo), comenzando la carga del payload recién a partir del 5° byte (`G1`) sobre canales `B` y `G`.
 - **Pseudocódigo confuso e ineficiente en la Sección 6:** El primer bucle itera por carácter (`For i = 1 to n`), luego `For each 2 bits` y posteriormente `For each colour from green and blue`, mezclando granularidades (un carácter tiene 8 bits, no 2). A continuación, el segundo bloque vuelve a ejecutar `For i = 1 to n` alrededor de la comparación global de patrones, lo cual es conceptualmente erróneo porque el conteo e inversión se evalúan sobre el total de bytes utilizados y no carácter por carácter. Como se documentó en las [notas de implementación de LSBI](https://github.com/jcausse-itba/CRIPTO/blob/main/doc/LSBI_Implementation_Notes.md), una implementación correcta requiere **dos pasadas** de embebido (pudiendo omitirse la segunda si ningún patrón requiere inversión) y **una única pasada** de extracción, leyendo primero el mapa de 4 bits en un arreglo `uint8_t[4]` para aplicar XOR bit a bit sin ramificaciones.
-- **Ausencia de consideraciones sobre el formato BMP y el manejo de *row padding*:** El paper describe el algoritmo sobre una secuencia abstracta de píxeles RGB sin contemplar las particularidades físicas de ningún formato de imagen (y por supuesto tampoco del formato BMP). En el formato BMP V3 de 24 bpp, los canales se almacenan en orden **`BGR`** (de abajo hacia arriba) y las filas se alinean a múltiplos de 4 bytes mediante bytes de *padding* cuando `(width * 3) % 4 != 0`. Si LSBI consumiera los bytes de *padding* dentro del flujo continuo (como sí establecen las pautas del enunciado para `LSB1` y `LSB4`), **el *padding* desalinearía el patrón periódico de salteo por canal (`B, G, R`) en cada salto de fila**. Por este motivo, tal como se registró en las [notas de implementación de LSBI](https://github.com/jcausse-itba/CRIPTO/blob/main/doc/LSBI_Implementation_Notes.md), **luego de conversarlo y acordarlo con la cátedra se tomó la decisión de diseño de no procesar ni considerar imágenes portadoras con *padding* en LSBI**, asumiendo portadoras que cumplen `(width * 3) % 4 == 0` para preservar de manera matemáticamente regular el descarte del canal rojo (`offset % 3 == 2`). Como salvaguarda adicional, `stegobmp` detecta si una portadora posee *padding* y, de poseer, emite un mensaje de nivel `WARN` en el *logger* al ejecutar `LSBI`.
+- **Ausencia de consideraciones sobre el formato BMP y el manejo de *row padding*:** El paper describe el algoritmo sobre una secuencia abstracta de píxeles RGB sin contemplar las particularidades físicas de ningún formato de imagen (y por supuesto tampoco del formato BMP). En el formato BMP V3 de 24 bpp, los canales se almacenan en orden **`BGR`** (de abajo hacia arriba) y las filas se alinean a múltiplos de 4 bytes mediante bytes de *padding* cuando `(width * 3) % 4 != 0`. Si LSBI consumiera los bytes de *padding* dentro del flujo continuo (como sí establecen las pautas del enunciado para `LSB1` y `LSB4`), **el *padding* desalinearía el patrón periódico de salteo por canal (`B, G, R`) en cada salto de fila**. Por este motivo, tal como se registró en las [notas de implementación de LSBI](https://github.com/jcausse-itba/CRIPTO/blob/main/doc/LSBI_Implementation_Notes.md), **luego de conversarlo y acordarlo con la cátedra se tomó la decisión de diseño de no procesar ni considerar imágenes portadoras con *padding* en LSBI**, asumiendo portadoras que cumplen `(width * 3) % 4 == 0` para preservar de manera matemáticamente regular el descarte del canal rojo (`offset % 3 == 2`). Como salvaguarda adicional, `stegobmp` detecta si una portadora posee *padding* y, de poseerlo, emite un mensaje de nivel `WARN` en el *logger* al ejecutar `LSBI`.
 
 ### 1.3. Claridad de Notación, Errores y Contradicciones
 
@@ -134,13 +134,13 @@ La notación matemática, los pseudocódigos y los ejemplos numéricos del artí
    El artículo asegura que la cita de prueba utilizada *"includes 226 characters or 2881 bits"*. La cadena citada tiene efectivamente 226 caracteres ASCII, lo que equivale a **$226 \times 8 = 1808$ bits** (o 1582 bits en 7 bits), jamás `2881` bits. Por otro lado, mientras el *Abstract* (p. 342) habla de ocultar *"the first and the second most significant bits (MSB) of the secret image"*, el experimento oculta texto plano y no una imagen secreta.
 6. **Contradicciones sobre capacidad y formato de las portadoras (Secciones 2 y 7):**
    - En la Sección 2 (p. 343) se menciona *"taking into consideration to increase the capacity of storing the secret data"*, cuando en realidad la técnica **disminuye** la capacidad frente al LSB estándar (pasa de 3 bits por píxel a 2 bits por píxel al descartar el canal rojo, descontando además los 4 bits reservados para el mapa).
-   - Todas las imágenes de prueba en la Sección 7 aparecen referenciadas como archivos **`.jpg`** (`Lena.jpg`, `Baboon.jpg`, `Peppers.jpg`, `trees.jpg`, `Plane.jpg`, `Tiffany.jpg`). El formato JPEG aplica compresión con pérdida en el dominio de frecuencias (DCT y cuantización), lo que destruiría los bits embebidos mediante LSB espacial si la _stego-image_ se almacenara comprimida en JPEG. Debido a esto, **las técnicas LSB requieren formatos sin pérdida (_lossless_) (como BMP o PNG)**.
+   - Todas las imágenes de prueba en la Sección 7 aparecen referenciadas como archivos **`.jpg`** (`Lena.jpg`, `Baboon.jpg`, `Peppers.jpg`, `trees.jpg`, `Plane.jpg`, `Tiffany.jpg`). El formato JPEG aplica compresión con pérdida en el dominio de frecuencias (DCT y cuantización), lo que destruiría los bits embebidos mediante LSB espacial si la _stego-image_ se almacenara comprimida en JPEG. Debido a esto, **las técnicas LSB requieren formatos sin pérdida (_lossless_, como BMP o PNG)**.
    - Los histogramas (Figs. 3, 4 y 5, pp. 346–347) presentan un eje horizontal que llega hasta `300` (pese a que el rango de un canal de 8 bits es `0..255`) y carecen de etiquetas de ejes o especificación de canal.
 7. **Errores sintácticos y semánticos en los pseudocódigos (Secciones 4 y 6):**
    - En el pseudocódigo de LSB estándar (Sección 4, p. 344): el primer bucle declara `For i = 1 to Length(c), do` pero asigna $S_j \leftarrow C_j$ (usando el índice $j$ sin inicializar); el segundo escribe la expresión inválida $S_{ji} \leftarrow \mathrm{LSB}(C_{ji}) = m_i$ mezclando asignación con igualdad; y el algoritmo de extracción recibe erróneamente `Input -: Secret image s` en vez de la estego-imagen $S$, leyendo $m_{ji} \leftarrow \mathrm{LSB}(C_{ji})$ desde el cover $C$ en lugar de $S$.
    - En el pseudocódigo de LSBI (Sección 6, pp. 345–346): utiliza asignaciones ambiguas (`Cover value = value`, `stego value = value`) y expresa la condición de inversión como *"If number of changed pixels in any pattern of pic was more than pixels that not changed in alternative pattern in the stego"*, cuando la comparación debe efectuarse respecto de los píxeles no cambiados del **mismo patrón** (`changed[p] > unchanged[p]`), no de un *"patrón alternativo"*.
 
-A modo de conclusión, la gran redundancia presente en las explicaciones de este _paper_ hace que el lector finalmente logre comprender la solución propuesta y luego implementarla (como fue el caso del presente Trabajo Práctico de Implementación); mas la baja calidad de redacción y la alta cantidad de imprecisiones, errores, ambigüedades y contradicciones presentes; sin duda dificulta su lectura y genera confusión en el lector al leerlo por primera vez.
+A modo de conclusión, la gran redundancia presente en las explicaciones de este _paper_ hace que el lector finalmente logre comprender la solución propuesta y luego implementarla (como fue el caso del presente Trabajo Práctico de Implementación); mas la baja calidad de redacción y la alta cantidad de imprecisiones, errores, ambigüedades y contradicciones presentes sin duda dificultan su lectura y generan confusión en el lector al leerlo por primera vez.
 
 <div style="page-break-after: always;"></div>
 
@@ -150,7 +150,7 @@ A modo de conclusión, la gran redundancia presente en las explicaciones de este
 
 ### 2.1. Ocultamiento de Prueba y Comparación de Resultados
 
-Para evaluar experimentalmente los tres algoritmos implementados, se ocultó un mismo archivo de prueba —el documento [`README.md`](../../README.md) del repositorio, de **`12.735` bytes** (`12.743` bytes totales en flujo esteganográfico considerando los `4` bytes del tamaño en *Big-Endian* y los `4` bytes de la extensión `.md\0`, equivalentes a `101.944` bits)— dentro de dos portadoras BMP V3 de 24 bpp sin compresión y sin *row padding*:
+Para evaluar experimentalmente los tres algoritmos implementados, se ocultó un mismo archivo de prueba —el documento [`README.md`](https://github.com/jcausse-itba/CRIPTO/blob/main/README.md) del repositorio, de **`12.735` bytes** (`12.743` bytes totales en flujo esteganográfico considerando los `4` bytes del tamaño en *Big-Endian* y los `4` bytes de la extensión `.md\0`, equivalentes a `101.944` bits)— dentro de dos portadoras BMP V3 de 24 bpp sin compresión y sin *row padding*:
 
 <div align="center">
   <table style="border: none; border-collapse: collapse; margin: 0 auto;">
@@ -244,7 +244,7 @@ Para evaluar experimentalmente los tres algoritmos implementados, se ocultó un 
 
 *Resolución del estegoanálisis sobre los 5 archivos provistos al Grupo 10 (`budapest.bmp`, `lifeofpi.bmp`, `madrid.bmp`, `silence.bmp` y `silenceG10.bmp`) — Sección 6 del Enunciado y Apartados III a VI.*
 
-> **Nota:** Cabe aclarar que el archivo `silenceG10.bmp` fue provisto posteriormente, debido a un error de des-encripción del original, `silence.bmp`.
+> **Nota:** Cabe aclarar que el archivo `silenceG10.bmp` fue provisto posteriormente, debido a un error de desencriptación del original, `silence.bmp`.
 
 > **Nota:** Debido al tamaño de las imágenes provistas por la cátedra, las mismas no fueron subidas al repositorio, pero se las referencia en este informe con los mismos nombres provistos, para evitar confusión.
 
@@ -296,7 +296,7 @@ juani@Spectre:~/CRIPTO$ ./stegobmp -v -extract -p grupo10/budapest.bmp -out out 
 [  INFO  ] --> Extract task succeeded
 ```
 
-Tras el éxito en la extracción, el programa produjo `out.bmp` (el nombre del archivo fue asignado de manera arbitraria, pero su extensión se encontraba dentro del secreto oculto en la imagen), una imagen del famoso juego "Buscaminas".
+Tras el éxito en la extracción, el programa produjo `out.png` (el nombre del archivo fue asignado de manera arbitraria, pero su extensión se encontraba dentro del secreto oculto en la imagen), una imagen del famoso juego "Buscaminas".
 
 <p align="center">
   <img src="./07_budapest_buscaminas.png" alt="Imagen Buscaminas extraída de budapest.bmp" width="480" />
@@ -304,7 +304,7 @@ Tras el éxito en la extracción, el programa produjo `out.bmp` (el nombre del a
   <em>Archivo <code>out.png</code> recuperado de <code>budapest.bmp</code> (captura del juego "Buscaminas").</em>
 </p>
 
-Luego, se procedió a esteganografiar los otros archivos (`lifeofpi.bmp`, `madrid.bmp` y `silence.bmp`), sabiendo que uno de ellos debía ser el que corresponde a `LSB1`, otro a `LSBI`, y otro el que tiene el secreto oculto mediante un método de estenografiado no estándar.
+Luego, se procedió a estegoanalizar los otros archivos (`lifeofpi.bmp`, `madrid.bmp` y `silence.bmp`), sabiendo que uno de ellos debía ser el que corresponde a `LSB1`, otro a `LSBI`, y otro el que tiene el secreto oculto mediante un método de esteganografiado no estándar.
 
 Se intentó primero con `LSBI` sin encripción:
 
@@ -354,9 +354,9 @@ La password esta en otro archivo
 Con algoritmo, modo y password hay un .wmv encriptado y oculto.
 ```
 
-El texto del archivo `sol10.txt` indicaba que había un mensaje oculto en el tablero del "Buscaminas", un carácter _ASCII_ por fila, donde en cada fila la posición de las minas representaba un `1` y el resto de las posiciones un `0`. Como cada fila tiene 6 columnas, precediendo `01` a cada fila (como indica la pista) se obtienen 6 tiras de 8 bits, que pueden interpretarse como 6 carácteres _ASCII_ de 8 bits cada uno.
+El texto del archivo `sol10.txt` indicaba que había un mensaje oculto en el tablero del "Buscaminas", un carácter _ASCII_ por fila, donde en cada fila la posición de las minas representaba un `1` y el resto de las posiciones un `0`. Como cada fila tiene 6 columnas, precediendo `01` a cada fila (como indica la pista) se obtienen 6 tiras de 8 bits, que pueden interpretarse como 6 caracteres _ASCII_ de 8 bits cada uno.
 
-Como en la captura del "Buscaminas" se indica que quedan 3 minas por marcar, primero se procedió a terminar el juego. Se marcaron con una cruz roja las 3 posiciones restanes con minas, y luego se interpretó cada casilla del tablero. El resultado fue el siguiente:
+Como en la captura del "Buscaminas" se indica que quedan 3 minas por marcar, primero se procedió a terminar el juego. Se marcaron con una cruz roja las 3 posiciones restantes con minas, y luego se interpretó cada casilla del tablero. El resultado fue el siguiente:
 
 <p align="center">
   <img src="./08_buscaminas_resuelto.png" alt="Acertijo del Buscaminas ya resuelto" width="480" />
@@ -374,7 +374,7 @@ En hexadecimal, los bytes formados son (por filas, de arriba hacia abajo): `[0x4
 Luego de resolver este acertijo, y considerando también la información proporcionada por `sol10.txt` se dedujo que alguno de los restantes dos archivos (`lifeofpi.bmp` o `silence.bmp`):
 - Contenía un video en formato `WMV`.
 - Estaba encriptado utilizando `AES-192` en modo `ECB`.
-- Utilizaba esteganografiado `LSB1` (esto se supo por eliminación, ya que el enunciado advertía que había uno con cada algoritmo de esteganografiado soportado por `stegobmp`; el único que quedaba sin utilizar era `LSB1`; y era muy probable que, si el archivo estaba encriptado, utilice un modo de esteganografiado estándar ya que debía ser esteganografiado con nuestro propio programa).
+- Utilizaba esteganografiado `LSB1` (esto se supo por eliminación, ya que el enunciado advertía que había uno con cada algoritmo de esteganografiado soportado por `stegobmp`; el único que quedaba sin utilizar era `LSB1`; y era muy probable que, si el archivo estaba encriptado, utilizara un modo de esteganografiado estándar ya que debía poder extraerse con nuestro propio programa).
 - La _password_ era desconocida.
 
 Por eliminación, también se supo que el otro de estos dos archivos restantes debía ser aquel que esté esteganografiado de forma no estándar, y que debía contener la _password_ faltante para el archivo encriptado.
@@ -387,9 +387,9 @@ juani@Spectre:~/CRIPTO$ du -h grupo10/lifeofpi.bmp grupo10/silence.bmp
 27M     grupo10/silence.bmp
 ```
 
-Efectivamente, `silence.bmp` era mucho más pesado. Ese archivo debía contener el video. Ahora bien, intentar esteganografiarlo en el momento hubiera sido una pérdida de tiempo, ya que se sabía que estaba encriptado. Era conveniente empezar por `lifeofpi.bmp`, que se sabía que tenía un método de esteganografiado no estándar.
+Efectivamente, `silence.bmp` era mucho más pesado. Ese archivo debía contener el video. Ahora bien, intentar extraerlo en ese momento hubiera sido una pérdida de tiempo, ya que se sabía que estaba encriptado. Era conveniente empezar por `lifeofpi.bmp`, que se sabía que tenía un método de esteganografiado no estándar.
 
-Para intentar revelar el contenido oculto en `lifeofpi.bmp`, se extrajeron los strings que contuviera dicho archivo. Como era muy probable que, de estar la información oculta como texto plano, estuviera o al principio o al final, se probó extraer strings utilizando `strings`, filtrando con `head` y `tail`.
+Para intentar revelar el contenido oculto en `lifeofpi.bmp`, se buscaron cadenas de texto legibles dentro del archivo. Como era muy probable que, de estar la información oculta como texto plano, se encontrara al principio o al final, se utilizó el comando `strings` filtrando la salida con `head` y `tail`.
 
 ```shell
 juani@Spectre:~/CRIPTO$ strings grupo10/lifeofpi.bmp | head -n 3
@@ -434,7 +434,7 @@ juani@Spectre:~/CRIPTO$ ./stegobmp -v -extract -p grupo10/silence.bmp -out out -
 [  INFO  ] --> Extract task failed
 ```
 
-Ahora bien, con la información proporcionada, la des-encripción falló por contraseña incorrecta. Se le solicitó otro a la cátedra para volver a intentar, y la des-encripción del segundo (`silenceG10.bmp`), utilizando los mismos parámetros, funcionó correctamente.
+Ahora bien, con la información proporcionada, la desencriptación falló por contraseña incorrecta. Se solicitó un nuevo archivo a la cátedra para volver a intentar, y la desencriptación del segundo (`silenceG10.bmp`), utilizando los mismos parámetros, funcionó correctamente.
 
 ```shell
 juani@Spectre:~/CRIPTO$ ./stegobmp -v -extract -p grupo10/silenceG10.bmp -out out -steg LSB1 -a AES192 -m ECB -pass aplausos
