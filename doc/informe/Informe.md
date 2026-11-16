@@ -116,9 +116,31 @@ Aunque la intuición del método se comprende mediante el ejemplo de la Sección
 
 *(Apartado I.c)*
 
-> *Completar analizando la consistencia de las fórmulas, convenciones de indexación y notaciones matemáticas, señalando ambigüedades, omisiones o posibles contradicciones encontradas en la redacción del artículo (por ejemplo: especificación de dónde almacenar el mapa de inversión, orden de canales RGB vs. BGR en BMP, o inconsistencias en ejemplos y tablas).*
+La notación matemática, los pseudocódigos y los ejemplos numéricos del artículo presentan serias imprecisiones, errores tipográficos y contradicciones directas:
 
----
+1. **Error tipográfico al enumerar los patrones (Sección 5, p. 344):**
+   En el paso 1 de la Sección 5 se escribe literalmente **`00, 10, 10, or 11`**, repitiendo el patrón `10` y omitiendo el patrón `01` (aunque en la página siguiente, tanto en el ejemplo como en el pseudocódigo, se enumeran correctamente como `00, 01, 10, or 11`).
+2. **Pérdida de superíndices en la fórmula de colores de 24 bits (Sección 3, p. 343):**
+   Al calcular el total de colores posibles en una imagen RGB de 24 bits, el texto imprime **`(28)3 = 16,777,216`** en lugar de (2<sup>8</sup>)<sup>3</sup> = 2<sup>24</sup> = 16.777.216, al perderse el formato de superíndices en la edición.
+3. **Inconsistencias graves en el ejemplo paso a paso de la Sección 5 (p. 345):**
+   - **Byte truncado:** El cuarto byte del cover (*D*) se introduce en el paso 1 como `10101101` (8 bits), pero en el recuadro del paso 2 figura truncado a 7 bits como **`1010110`**, reapareciendo con 8 bits en `LSB stego-image` (`10101101`).
+   - **Etiquetado incoherente:** En el resultado final del paso 4.c se listan tres bytes (`10001100  10101101  10101100`), pero debajo se colocan **cuatro etiquetas** (**`A   A   B   D`**), duplicando la letra `A`.
+   - **Contradicción matemática en el patrón `01` (paso 4.b):** Para el patrón `01` (byte `C = 10101011`, un único byte), el texto afirma que *"no se puede verificar cuántos píxeles cambiaron y cuántos no, porque hay un solo píxel y la comparación no puede ocurrir"*. Esto es falso: con un solo elemento, si su LSB cambió (`changed = 1`, `unchanged = 0`), entonces `1 > 0` es verdadero (correspondería invertir); y si no cambió (`changed = 0`, `unchanged = 1`), `0 > 1` es falso (no se invierte). No existe ninguna indeterminación matemática para `N = 1` (basta comparar `changed > unchanged`).
+   - **Falta de información con el filtrado de canales:** El ejemplo oculta los 4 bits `1011` en los 4 bytes consecutivos `A, B, C, D` sin aclarar a qué canales pertenecen ni aplicar la omisión del canal rojo.
+4. **Errores de notación en las ecuaciones de MSE y PSNR (Sección 7, p. 347):**
+   - El texto define la imagen cover `C` de tamaño `M × M` (píxeles `0` a `M−1`) y la estego-imagen `S` de tamaño `N × N` (píxeles `0` a `N−1`), lo cual carece de sentido para una comparación píxel a píxel porque ambas deben tener iguales dimensiones.
+   - Al trabajar con imágenes color RGB de 24 bits (3 canales por píxel), omite aclarar si el MSE se promedia también entre los 3 canales (`1 / 3MN`) y tampoco explicita el valor de `MAX = 255` en PSNR.
+5. **Contradicción en la longitud del mensaje secreto experimental (Sección 7, p. 346):**
+   El artículo asegura que la cita de prueba utilizada *"includes 226 characters or 2881 bits"*. La cadena citada tiene efectivamente 226 caracteres ASCII, lo que equivale a **`226 × 8 = 1808` bits** (o 1582 bits en 7 bits), jamás `2881` bits. Por otro lado, mientras el *Abstract* (p. 342) habla de ocultar *"the first and the second most significant bits (MSB) of the secret image"*, el experimento oculta texto plano y no una imagen secreta.
+6. **Contradicciones sobre capacidad y formato de las portadoras (Secciones 2 y 7):**
+   - En la Sección 2 (p. 343) se menciona *"taking into consideration to increase the capacity of storing the secret data"*, cuando en realidad la técnica **disminuye** la capacidad frente al LSB estándar (pasa de 3 bits por píxel a 2 bits por píxel al descartar el canal rojo, descontando además los 4 bits reservados para el mapa).
+   - Todas las imágenes de prueba en la Sección 7 aparecen referenciadas como archivos **`.jpg`** (`Lena.jpg`, `Baboon.jpg`, `Peppers.jpg`, `trees.jpg`, `Plane.jpg`, `Tiffany.jpg`). El formato JPEG aplica compresión con pérdida en el dominio de frecuencias (DCT y cuantización), lo que destruiría los bits embebidos mediante LSB espacial si la _stego-image_ se almacenara comprimida en JPEG. Debido a esto, **las técnicas LSB requieren formatos sin pérdida (_lossless_) (como BMP o PNG)**.
+   - Los histogramas (Figs. 3, 4 y 5, pp. 346–347) presentan un eje horizontal que llega hasta `300` (pese a que el rango de un canal de 8 bits es `0..255`) y carecen de etiquetas de ejes o especificación de canal.
+7. **Errores sintácticos y semánticos en los pseudocódigos (Secciones 4 y 6):**
+   - En el pseudocódigo de LSB estándar (Sección 4, p. 344): el primer bucle declara `For i = 1 to Length(c), do` pero asigna S<sub>j</sub> ← C<sub>j</sub> (usando el índice `j` sin inicializar); el segundo escribe la expresión inválida S<sub>ji</sub> ← LSB(C<sub>ji</sub>) = m<sub>i</sub> mezclando asignación con igualdad; y el algoritmo de extracción recibe erróneamente `Input -: Secret image s` en vez de la estego-imagen `S`, leyendo m<sub>ji</sub> ← LSB(C<sub>ji</sub>) desde el cover `C` en lugar de `S`.
+   - En el pseudocódigo de LSBI (Sección 6, pp. 345–346): utiliza asignaciones ambiguas (`Cover value = value`, `stego value = value`) y expresa la condición de inversión como *"If number of changed pixels in any pattern of pic was more than pixels that not changed in alternative pattern in the stego"*, cuando la comparación debe efectuarse respecto de los píxeles no cambiados del **mismo patrón** (`changed[p] > unchanged[p]`), no de un *"patrón alternativo"*.
+
+A modo de conclusión, la gran redundancia presente en las explicaciones de este _paper_ hace que el lector finalmente logre comprender la solución propuesta y luego implementarla (como fue el caso del presente Trabajo Práctico de Implementación); mas la baja calidad de redacción y la alta cantidad de imprecisiones, errores, ambigüedades y contradicciones presentes; sin duda dificulta su lectura y genera confusión en el lector al leerlo por primera vez.
 
 <div style="page-break-after: always;"></div>
 
