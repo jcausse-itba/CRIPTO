@@ -225,97 +225,6 @@ def generate_diff_map(
     canvas.save(out_path, format="PNG", optimize=True)
 
 
-def generate_bitplane_comparison(
-    orig_path: Path,
-    stego_paths: dict[str, Path],
-    out_path: Path,
-) -> None:
-    """
-    Show a zoomed bottom strip (where BMP embedding starts) comparing:
-    - Top row: 4-LSB plane ((val & 0x0F) * 17) across Original, LSB4, LSB1, LSBI
-    - Bottom row: 1-LSB Red-channel plane ((R & 1) * 255) showing LSB1 noise vs LSBI preservation
-    """
-    with Image.open(orig_path) as orig_im:
-        orig_rgb = orig_im.convert("RGB")
-    w, h = orig_rgb.size
-
-    # Crop bottom 90 rows at 1:1 pixel resolution so transition lines of LSB4 (~13 rows),
-    # LSB1 (~49 rows) and LSBI (~73 rows) are razor-sharp without resampling artifacts.
-    crop_w = min(270, w)
-    crop_h = min(90, h)
-    x0 = (w - crop_w) // 2
-    y0 = h - crop_h
-
-    cols = ["Original", "LSB4", "LSB1", "LSBI"]
-    sources = {"Original": orig_rgb}
-    for alg in ["LSB4", "LSB1", "LSBI"]:
-        with Image.open(stego_paths[alg]) as im:
-            sources[alg] = im.convert("RGB")
-
-    scale_w = crop_w
-    scale_h = crop_h
-    margin_x = 18
-    left_label_w = 150
-    top_h = 72
-    row_gap = 28
-
-    canvas_w = left_label_w + len(cols) * scale_w + (len(cols) + 1) * margin_x
-    canvas_h = top_h + scale_h * 2 + row_gap + 38
-    canvas = Image.new("RGB", (canvas_w, canvas_h), (250, 251, 253))
-    draw = ImageDraw.Draw(canvas)
-
-    font_title = load_font(bold=True, size=19)
-    font_col = load_font(bold=True, size=15)
-    font_row = load_font(bold=True, size=14)
-    font_small = load_font(bold=False, size=12)
-
-    draw.text(
-        (20, 14),
-        f"Comparación de Planos de Bits (Franja inferior {crop_w}×{crop_h} px)",
-        fill=(20, 32, 54),
-        font=font_title,
-    )
-
-    row_specs = [
-        ("Plano 4-LSB\n(RGB & 0x0F × 17)", "lsb4"),
-        ("Plano 1-LSB\n(Solo Canal Rojo)", "red_lsb1"),
-    ]
-
-    for r_idx, (r_label, mode) in enumerate(row_specs):
-        ry = top_h + r_idx * (scale_h + row_gap)
-        draw.multiline_text((20, ry + 34), r_label, fill=(35, 48, 70), font=font_row, spacing=4)
-
-        for c_idx, name in enumerate(cols):
-            cx = left_label_w + margin_x + c_idx * (scale_w + margin_x)
-            if r_idx == 0:
-                draw.text((cx, 46), name, fill=(11, 83, 148), font=font_col)
-
-            src = sources[name].crop((x0, y0, x0 + crop_w, y0 + crop_h))
-            s_px = src.load()
-            out_tile = Image.new("RGB", (crop_w, crop_h))
-            o_px = out_tile.load()
-
-            for yy in range(crop_h):
-                for xx in range(crop_w):
-                    r, g, b = s_px[xx, yy]
-                    if mode == "lsb4":
-                        o_px[xx, yy] = ((r & 0x0F) * 17, (g & 0x0F) * 17, (b & 0x0F) * 17)
-                    else:
-                        v = 255 if (r & 0x01) else 0
-                        o_px[xx, yy] = (v, v, v)
-
-            canvas.paste(out_tile, (cx, ry))
-            draw.rectangle([cx - 1, ry - 1, cx + scale_w, ry + scale_h], outline=(160, 172, 190), width=1)
-
-    draw.text(
-        (left_label_w + margin_x, canvas_h - 28),
-        "Nota: En BMP el almacenamiento es bottom-up; LSB4 introduce un bloque de ruido neto abajo, mientras LSBI deja el plano 1-LSB Rojo intacto.",
-        fill=(80, 90, 105),
-        font=font_small,
-    )
-    canvas.save(out_path, format="PNG", optimize=True)
-
-
 def generate_metrics_chart(metrics: Sequence[StegoMetrics], out_path: Path) -> None:
     """Draw a two-panel chart: (Left) PSNR in dB, (Right) Modified bytes by channel (B, G, R)."""
     w, h = 1160, 470
@@ -468,11 +377,6 @@ def main() -> None:
         cat_stegos,
         args.out_dir / "comparacion_mapa_cambios.png",
         "Mapa Espacial de Píxeles Alterados en cat_v3.bmp (README.md embebido)",
-    )
-    generate_bitplane_comparison(
-        cat_orig,
-        cat_stegos,
-        args.out_dir / "comparacion_planos_bits.png",
     )
     generate_metrics_chart(
         all_metrics,
