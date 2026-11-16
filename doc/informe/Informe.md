@@ -506,15 +506,18 @@ Dentro del archivo `out.png` (`43.170` bytes) recuperado originalmente desde `bu
 
 *(Apartado V)*
 
-> *Analizar el fragmento de video recuperado donde se ejemplifica una técnica de ocultamiento de información.*
+- **Archivo portador de origen:** `silenceG10.bmp` (`2500 × 3688` px, `LSB1` + `AES-192` en modo `ECB`, contraseña `aplausos`) $\rightarrow$ `out.wmv` (`2.041.764` bytes, `320 × 240` px, duración `53,6 s`, audio en español).
+- **Escena / Película identificada:** Fragmento de la película ***Wanted*** (2008, *Se busca*), en el que Sloan (Morgan Freeman) le muestra a Wesley Gibson (James McAvoy) el secreto del **Telar del Destino** (*Loom of Fate*) empleado por la organización de tejedores llamada en el doblaje en español del clip **"La Hermandad"**.
+- **Información ocultada:** **Los nombres de los objetivos (víctimas)** asignados por la organización, codificados en binario mediante aparentes irregularidades en la trama textil.
+- **Portador utilizado en el fragmento:** **Paños de tela / tejido textil producidos en un telar**. Para un observador común, los saltos de hilo parecen simples defectos de fabricación de una tela ordinaria, ocultando la existencia misma del mensaje.
+- **Descripción de la escena y mecánica observada:**
+  Sloan relata que un clan ancestral descubrió un lenguaje binario oculto en el entrecruzamiento de los hilos del telar: **cuando el hilo vertical pasa por encima de la trama representa un `1`, y cuando pasa por debajo representa un `0`** (*"Si el hilo vertical está encima, es un uno. Si está debajo, es un cero"*). Al inspeccionar la tela con una lupa y transcribir esa secuencia de bits en una grilla sobre papel, los bloques binarios se traducen a letras que revelan el nombre del objetivo. La escena ilustra de manera directa el principio fundamental de la esteganografía: camuflar bits de datos dentro de variaciones aparentemente naturales o imperfecciones de un soporte cotidiano, de modo análogo a las alteraciones de baja significancia sobre los píxeles de una imagen digital.
 
-- **Archivo portador de origen:** *Completar.*
-- **Escena / Película identificada:** *Completar.*
-- **Información ocultada:** *Completar.*
-- **Portador utilizado en el fragmento:** *Completar.*
-- **Descripción de la escena / mecánica observada:** *Completar.*
-
-<!-- Espacio para captura del fotograma del video -->
+<p align="center">
+  <img src="./09_wanted_telar.png" alt="Fotogramas de Wanted mostrando el código binario en el telar" width="640" />
+  <br>
+  <em>Fotogramas de <code>out.wmv</code> (<em>Wanted</em>, 2008): cruce binario de los hilos bajo la lupa y decodificación sobre papel hacia las letras del objetivo.</em>
+</p>
 
 ### 3.5. Algoritmo No Estándar Encontrado
 
