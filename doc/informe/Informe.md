@@ -466,83 +466,15 @@ Como se ve arriba, se logró obtener el archivo `WMV` oculto. El mismo contiene 
 
 *(Apartado III)*
 
-#### Cuadro Resumen de Hallazgos
+A continuación se resumen los hallazgos obtenidos tras el estegoanálisis de las portadoras provistas al Grupo 10:
 
-| Archivo Portador | Dimensiones / Tamaño | Método Detectado | Cifrado / Password | Archivo Recuperado |
+| Archivo Portador | Dimensiones / Tamaño | Método Detectado | Cifrado / Parámetros | Archivo / Contenido Recuperado |
 | :--- | :--- | :--- | :--- | :--- |
-| `budapest.bmp` | `1920 × 1080` (`6.220.854 B`) | `LSB4` | *Completar* | Imagen `.png` ("Buscaminas") |
-| `lifeofpi.bmp` | `1600 × 1000` (`4.800.077 B`) | *Completar* | *Completar (pista: `aplausos`)* | *Completar* |
-| `madrid.bmp` | `4352 × 2900` (`37.862.454 B`) | *Completar* | *Completar* | *Completar* |
-| `silence.bmp` | `2500 × 3688` (`27.660.054 B`) | *Completar (No estándar)* | *Completar* | *Completar* |
-
----
-
-#### Archivo 1: `budapest.bmp`
-
-- **Propiedades del portador:** `1920 × 1080 px`, `24 bpp`, sin compresión (`6.220.854` bytes).
-- **Método detectado:** `LSB4`.
-- **Cifrado / Parámetros:** *Completar (indicar si estaba cifrado o sin cifrado, algoritmo/modo/password en caso de aplicar).*
-- **Contenido extraído:** Archivo `.png` con una imagen del juego "Buscaminas".
-- **Procedimiento aplicado:**
-  > *Completar detallando los pasos de detección (por ejemplo, identificación de artefactos visuales en los 4 LSB superiores de la imagen) y el comando de extracción ejecutado:*
-
-
----
-
-#### Archivo 2: `lifeofpi.bmp`
-
-- **Propiedades del portador:** `1600 × 1000 px`, `24 bpp`, sin compresión (`4.800.077` bytes en disco; `bfSize = 4.800.054` bytes).
-- **Método detectado:** *Completar (`LSB1` / `LSB4` / `LSBI` / Otro).*
-- **Cifrado / Parámetros:** *Completar (indicar algoritmo, modo y contraseña; pista detectada al final del archivo: `"la password es aplausos"`).*
-- **Contenido extraído:** *Completar (nombre y extensión del archivo recuperado).*
-- **Procedimiento aplicado:**
-  > *Completar detallando los pasos, hallazgo de los 23 bytes excedentes al final del BMP mediante `strings` y parámetros utilizados en la extracción:*
-  ```shell
-  ./stegobmp -extract -p grupo10/lifeofpi.bmp -out <salida> -steg <ALG> ...
-  ```
-
-<p align="center">
-  <img src="./lifeofpi_strings_tail.png" alt="Salida de strings sobre lifeofpi.bmp" width="600" />
-  <br>
-  <em>Ejecución de <code>strings lifeofpi.bmp | tail -n 5</code> revelando la contraseña al final del archivo.</em>
-</p>
-
----
-
-#### Archivo 3: `madrid.bmp`
-
-- **Propiedades del portador:** `4352 × 2900 px`, `24 bpp`, sin compresión (`37.862.454` bytes).
-- **Método detectado:** *Completar (`LSB1` / `LSB4` / `LSBI` / Otro).*
-- **Cifrado / Parámetros:** *Completar.*
-- **Contenido extraído:** *Completar (nombre y extensión del archivo recuperado).*
-- **Procedimiento aplicado:**
-  > *Completar detallando los pasos, análisis realizado y comando/parámetros utilizados:*
-  ```shell
-  ./stegobmp -extract -p grupo10/madrid.bmp -out <salida> -steg <ALG> ...
-  ```
-
-<!-- Espacio para captura de evidencia o contenido recuperado de madrid.bmp:
-<p align="center">
-  <img src="./madrid_evidencia.png" alt="Evidencia sobre madrid.bmp" width="580" />
-</p>
--->
-
----
-
-#### Archivo 4: `silence.bmp`
-
-- **Propiedades del portador:** `2500 × 3688 px`, `24 bpp`, sin compresión (`27.660.054` bytes).
-- **Método detectado:** *Completar (método alternativo descubierto).*
-- **Cifrado / Parámetros:** *Completar.*
-- **Contenido extraído:** *Completar (nombre y extensión del archivo recuperado).*
-- **Procedimiento aplicado:**
-  > *Completar detallando los pasos de descubrimiento, herramientas utilizadas y forma de recuperación del archivo oculto.*
-
-<!-- Espacio para captura de evidencia sobre silence.bmp:
-<p align="center">
-  <img src="./silence_evidencia.png" alt="Evidencia sobre silence.bmp" width="580" />
-</p>
--->
+| `budapest.bmp` | `1920 × 1080` (`6.220.854 B`) | `LSB4` | Sin cifrado | `out.png` (`43.170 B`): captura de *Buscaminas* + ZIP anexo (`sol10.txt`). |
+| `madrid.bmp` | `4352 × 2900` (`37.862.454 B`) | `LSBI` | Sin cifrado | `out.pdf` (`6.407 B`): pista *"al .png cambiarle la extension por .zip y descomprimir"*. |
+| `lifeofpi.bmp` | `1600 × 1000` (`4.800.077 B`) | No estándar (`23 B` anexados post-`bfSize`) | Sin cifrado | Texto plano ASCII al final del archivo: `"la password es aplausos"`. |
+| `silence.bmp` | `2500 × 3688` (`27.660.054 B`) | `LSB1` *(presunto)* | `AES-192` / `ECB` / `aplausos` | Desencriptación fallida (portadora original reemplazada por la cátedra). |
+| `silenceG10.bmp` | `2500 × 3688` (`27.660.054 B`) | `LSB1` | `AES-192` / `ECB` / `aplausos` | `out.wmv` (`2.041.764 B`): fragmento de video de la película *"Wanted"* (2008). |
 
 ---
 
