@@ -36,10 +36,6 @@
     <td style="border: none; padding: 4px 12px;"><strong>Branch:</strong></td>
     <td style="border: none; padding: 4px 12px;"><code>main</code></td>
   </tr>
-  <tr>
-    <td style="border: none; padding: 4px 12px;"><strong>Commit Hash:</strong></td>
-    <td style="border: none; padding: 4px 12px;"><code>39cdd24ec5daaf2385633f67e07e633643abc1f6</code></td>
-  </tr>
 </table>
 
 </div>
@@ -66,6 +62,7 @@
    - [4.2. Alternativas para el Registro de Patrones Invertidos](#42-alternativas-para-el-registro-de-patrones-invertidos) *(VIII)*
    - [4.3. Dificultades Encontradas durante la Implementación](#43-dificultades-encontradas-durante-la-implementación) *(IX)*
    - [4.4. Propuestas de Mejoras y Extensiones Futuras](#44-propuestas-de-mejoras-y-extensiones-futuras) *(X)*
+5. [Conclusiones Finales](#5-conclusiones-finales)
 
 <div style="page-break-after: always;"></div>
 
@@ -235,8 +232,6 @@ Para evaluar experimentalmente los tres algoritmos implementados, se ocultó un 
 | **LSB1** | Media ($\frac{1}{8}$ del total de bytes = `3 bits/píxel`). | Muy baja ($\Delta_{\max} = 1$; PSNR $\sim 62{,}7\text{--}63{,}9\text{ dB}$ en las pruebas). | Baja: los 3 canales se alteran de forma uniforme; una lectura directa de LSB expone el tamaño y el payload secuencial. | Muy simple: **1 pasada** tanto para embeber como para extraer; acepta *row padding* contiguo. | Sencillez de implementación, buen equilibrio entre capacidad y alta imperceptibilidad visual. | Predecible para herramientas de extracción automática y vulnerable a inspección de planos LSB en cualquiera de los 3 canales. |
 | **LSB4** | Muy alta ($\frac{1}{2}$ del total de bytes = `12 bits/píxel`, $4\times$ más que `LSB1`). | Media/Alta ($\Delta_{\max} = 15$; PSNR cae a $\sim 49{,}5\text{--}50{,}9\text{ dB}$). Genera artefactos visibles en zonas uniformes y alteración notoria en planos `4-LSB`. | Muy baja: deja un corte abrupto fácilmente detectable en los 4 bits menos significativos e incluso a simple vista con zoom sobre tonos lisos. | Simple: **1 pasada** (2 nibbles por byte secreto); acepta *row padding* contiguo. | Permite ocultar archivos muy grandes en portadoras relativamente pequeñas y requiere menos bytes tocados para un mismo mensaje. | Degradación notable de la imagen (MSE alto, menor PSNR) y alta detectabilidad visual y en análisis de planos de bits. |
 | **LSBI** | Moderada ($\sim \frac{2}{3}$ de `LSB1`, unos `2 bits/píxel` menos `4 bits` de mapa). | Mínima ($\Delta_{\max} = 1$; mejor PSNR observado: $\sim 62{,}8\text{--}63{,}9\text{ dB}$). El canal Rojo permanece intacto, reduciendo el impacto perceptual. | Alta frente a métodos simples: el canal Rojo actúa como ruido/distractor y la inversión por patrones limita las alteraciones por grupo a $\le 50\%$, impidiendo lectura LSB directa sin conocer el mapa. | Mayor: **2 pasadas** en embebido (2ª omitible si no hay inversión) y **1 pasada** con arreglo XOR en extracción. Requiere portadoras sin *row padding*. | Máxima fidelidad (PSNR), menor cantidad de bytes modificados y doble capa de dificultad (omisión del canal Rojo + inversión condicional). | Menor capacidad máxima ($-33\%$ frente a `LSB1`), mayor huella espacial en filas utilizadas y no soporta imágenes BMP con *padding* entre filas. |
-
----
 
 <div style="page-break-after: always;"></div>
 
@@ -476,8 +471,6 @@ A continuación se resumen los hallazgos obtenidos tras el estegoanálisis de la
 | `silence.bmp` | `2500 × 3688` (`27.660.054 B`) | `LSB1` *(presunto)* | `AES-192` / `ECB` / `aplausos` | Desencriptación fallida (portadora original reemplazada por la cátedra). |
 | `silenceG10.bmp` | `2500 × 3688` (`27.660.054 B`) | `LSB1` | `AES-192` / `ECB` / `aplausos` | `out.wmv` (`2.041.764 B`): fragmento de video de la película *"Wanted"* (2008). |
 
----
-
 ### 3.3. Análisis de Mensajes Anidados
 
 *(Apartado IV)*
@@ -533,8 +526,6 @@ Dentro del archivo `out.png` (`43.170` bytes) recuperado originalmente desde `bu
   2. **Escasa resistencia estadística ante cargas cifradas:** Incluso si el texto agregado se hubiera cifrado previamente, la presencia de bytes excedentes tras el fin lógico de la imagen —sumada a un salto brusco de entropía al final del archivo— seguiría delatando la existencia de información oculta.
   3. **Nula robustez ante re-procesamiento:** Si la imagen se abre y vuelve a guardarse con cualquier editor, se recorta o se convierte a otro formato (como PNG o JPEG), el software decodificador lee únicamente los $1600 \times 1000$ píxeles válidos y **descarta automáticamente los bytes posteriores a la imagen**, destruyendo el mensaje oculto por completo.
 
----
-
 <div style="page-break-after: always;"></div>
 
 ## 4. Discusión Técnica y Mejoras del Algoritmo
@@ -545,31 +536,56 @@ Dentro del archivo `out.png` (`43.170` bytes) recuperado originalmente desde `bu
 
 *(Apartado VII)*
 
-> *Explicar por qué la propuesta de Majeed y Sulaiman representa una mejora efectiva respecto de LSB común:*
-> - *Garantía de modificación máxima $\le 50\%$ en cada grupo de patrón (`00`, `01`, `10`, `11`) mediante inversión condicional de bits.*
-> - *Incremento directo de la relación señal-ruido pico (PSNR) y menor distorsión estadística de pares de valores (PoVs).*
-> - *Uso selectivo de los canales Azul (B) y Verde (G), dejando intacto el canal Rojo (R) como capa de ruido/distracción frente a inspectores de LSB secuencial.*
+La mejora de `LSBI` sobre `LSB1` clásico se apoya en tres mecanismos concretos:
+
+- **Cota del $50\%$ en bits alterados por patrón:** En LSB estándar se modifica en promedio cerca de la mitad de los bits intervenidos. Al clasificar cada byte portador según sus bits 2° y 3° (`00`, `01`, `10`, `11`) e invertir el LSB de todo un grupo cuando `changed > unchanged`, `LSBI` garantiza matemáticamente que **como máximo la mitad de los bytes usados de cada patrón** cambien respecto de la portadora original. En las pruebas de la sección [2.1](#21-ocultamiento-de-prueba-y-comparación-de-resultados), esto redujo el total de bytes modificados frente a `LSB1` (`50.513` vs. `51.054` en `cat_v3.bmp` y `50.803` vs. `50.975` en `eiffel_tower_v3.bmp`) y dio el mejor $\text{PSNR}$ en ambos casos.
+- **Menor sensibilidad perceptual (exclusión del canal Rojo):** Al omitir el canal Rojo (`R`) y ocultar solo en Azul (`B`) y Verde (`G`), se preserva el canal al que el ojo humano dedica mayor proporción de conos sensibles según el *paper* (~65%), además de dejar intacto un tercio de los bytes dentro de la región alterada.
+- **Menor exposición ante extracción secuencial:** Un atacante que intente leer LSB consecutivos obtiene datos incoherentes si no conoce ni el mapa de inversión de 4 bits ni el descarte del canal Rojo.
 
 ### 4.2. Alternativas para el Registro de Patrones Invertidos
 
 *(Apartado VIII)*
 
-> *Analizar de qué otras maneras o en qué otras ubicaciones del archivo portador/metadatos podrían almacenarse los 4 bits de control correspondientes a los patrones invertidos en lugar de anteponerlos en los primeros 4 bytes del cuerpo de la imagen (por ejemplo: campos reservados de la cabecera BMP como `bfReserved1`/`bfReserved2`, al final del flujo de píxeles, en bytes de padding de fila, o en posiciones pseudoaleatorias determinadas mediante una clave/semilla), evaluando ventajas, desventajas y riesgos de cada alternativa.*
+Además de anteponer los 4 bits en los primeros 4 bytes del cuerpo de la imagen, existen otras ubicaciones posibles, cada una con compromisos claros:
+
+- **Últimos 4 bytes del flujo de píxeles:** Tiene el mismo impacto mínimo en píxeles que ponerlo al inicio y no toca cabeceras, pero impide decodificar en un único recorrido lineal hacia adelante porque obliga a leer primero el final del archivo.
+- **Campos reservados de la cabecera (`bfReserved1` y `bfReserved2`):** Son 4 bytes disponibles en `BITMAPFILEHEADER` que deberían valer `0` y los visores ignoran sin alterar ningún píxel. Como contra, son triviales de detectar inspeccionando la cabecera y cualquier editor de imágenes que re-guarde el BMP vuelve a ponerlos en cero.
+- **Bytes de *padding* de fila o píxeles pseudoaleatorios:** Usar el *padding* de alineación no altera colores visibles, pero solo sirve en imágenes cuyo ancho cumpla `(width * 3) % 4 != 0`. Distribuir esos 4 bits mediante una posición pseudoaleatoria mejora el sigilo, aunque obliga a compartir una clave/semilla incluso cuando no se utiliza cifrado.
+- **Datos anexados al final del archivo (*EOF appending*):** No modifica la imagen en absoluto, pero genera una discrepancia obvia frente a `bfSize` (como ocurrió en `lifeofpi.bmp`) y se pierde si la imagen es re-codificada.
 
 ### 4.3. Dificultades Encontradas durante la Implementación
 
 *(Apartado IX)*
 
-> *Detallar los contratiempos técnicos y ambigüedades enfrentadas al llevar el algoritmo del paper a la implementación final en C (`stegobmp`), considerando puntos como:*
-> - *Ambigüedad del paper original sobre el almacenamiento exacto del mapa de inversión de 4 bits (definido finalmente mediante los lineamientos acordados con la cátedra).*
-> - *Disposición física de los bytes en BMP (`BGR` de abajo hacia arriba) y correcta sincronización del descarte del canal Rojo a partir del 5° byte.*
-> - *Manejo del padding de alineación por fila en BMP V3 (desalineación del patrón `B, G, R` en LSBI y validación con advertencia `WARN`, frente a uso contiguo en `LSB1`/`LSB4`).*
-> - *Conversión explícita de endianness (`Big-Endian` para cabeceras de tamaño frente a arquitectura x86_64 `Little-Endian`).*
-> - *Diseño de doble pasada en inserción (con omisión de la segunda si no hay inversión) versus extracción en una única pasada mediante arreglo `uint8_t[4]` y XOR sin ramificaciones.*
-> - *Compatibilidad estricta con BMP V3 de 24 bpp sin compresión y detalles de OpenSSL (`PBKDF2-HMAC-SHA256`, modos `CFB8`/`OFB128` y padding `PKCS#5/PKCS#7`).*
+Al llevar el diseño del *paper* y del enunciado al ejecutable en C (`stegobmp`), los principales obstáculos fueron:
+
+- **Vacíos en la especificación del *paper*:** El artículo no definía la ubicación exacta ni el orden de los 4 bits del mapa, ni especificaba el orden de bits por byte secreto, y su pseudocódigo mezclaba la decisión de inversión dentro del bucle por carácter. Hubo que acordar primero esas definiciones con la cátedra para garantizar compatibilidad y separar el embebido en dos pasadas (omitiendo la segunda cuando ningún patrón se invierte).
+- **Disposición física `BGR` y conflicto con el *row padding*:** En BMP V3 los canales se leen en orden `B, G, R` de abajo hacia arriba. Si `LSBI` consumiera bytes de *padding* al final de cada fila como un flujo continuo, la periodicidad `offset % 3 == 2` usada para saltear el canal Rojo se desfasaría fila a fila. Por decisión conjunta con la cátedra se asumieron portadoras sin *padding* para `LSBI`, agregando en `stegobmp` una advertencia `WARN` si se detecta *padding*.
+- **Extracción modular sin estado interno:** En `extract.c`, primero se extraen los 4 bytes de tamaño y luego el payload en llamadas separadas a `stego_extract_bytes`. Como el cursor avanza tras leer la cabecera de tamaño, en llamadas posteriores ya no apunta al inicio del bitmap, por lo que hubo que incorporar lectura aleatoria por índice (`bitmap_get_byte_at`) para consultar los 4 bits de inversión sin mover el cursor.
+- **Endianness y detalles de OpenSSL:** Fue necesario convertir explícitamente las longitudes de 32 bits entre *Little-Endian* nativo y *Big-Endian*, y ajustar exactamente los modos pedidos sobre `EVP` (`PKCS5_PBKDF2_HMAC` con `SHA-256`, `10.000` iteraciones y salt nulo de 8 bytes; variantes `cfb8` y `ofb` de 128 bits; y `des_ede3` para 3DES).
 
 ### 4.4. Propuestas de Mejoras y Extensiones Futuras
 
 *(Apartado X)*
 
-> *Proponer optimizaciones o ampliaciones futuras para `stegobmp` (por ejemplo: dispersión pseudoaleatoria de bits guiada por semilla/clave, soporte para otros formatos sin pérdida como PNG o WAV y cabeceras BMP V4/V5, módulo de estegoanálisis automático integrado en la CLI, compresión previa al cifrado para maximizar la capacidad útil, procesamiento por streaming para imágenes de gran tamaño o cálculo integrado de métricas como PSNR).*
+Como extensiones concretas sobre la base actual de `stegobmp`, se podrían incorporar:
+
+- **Manejo explícito de *row padding* en `LSBI`:** Hacer que la navegación de bytes en `LSBI` saltee los bytes de relleno al final de cada fila usando el `stride`, habilitando portadoras de cualquier ancho.
+- **Dispersión pseudoaleatoria por clave:** En lugar de escribir de forma contigua desde la base inferior de la imagen (lo que genera franjas detectables como se vio en `budapest.bmp`), distribuir los bits modificados sobre toda la portadora mediante un PRNG sembrado con una contraseña.
+- **Soporte para más formatos y cabeceras:** Extender la lectura de portadoras a BMP V4/V5 y otros formatos sin pérdida habituales como PNG o WAV.
+- **Compresión y utilidades de diagnóstico en la CLI:** Comprimir el archivo antes de cifrarlo/embeberlo para aprovechar mejor la capacidad disponible, y sumar un modo de inspección (como el prototipado en `stego_analysis.py` y `bmp_inspector.py`) que informe capacidad, anomalías en cabeceras/EOF y $\text{PSNR}$ resultante.
+
+<div style="page-break-after: always;"></div>
+
+## 5. Conclusiones Finales
+
+Como conclusión final de este Trabajo Práctico de Implementación, queremos destacar que el mismo resultó interesante de implementar, y divertido al final cuando tuvimos que utilizar nuestro propio programa para resolver el ejercicio estilo _Capture The Flag_ presentado en la sección [3.1](#31-metodología-y-procedimiento-de-descubrimiento). Al mismo tiempo, consideramos positivas las enseñanzas que la implementación nos dejó:
+
+- Primer acercamiento al campo de la esteganografía, viendo formas estándar y no estándar de realizarla, y viendo varios ejemplos y modos de ocultamiento de la información.
+- Contacto con la implementación de un algoritmo descrito en un _paper_ (donde nos sorprendió la gran cantidad de imprecisiones y faltantes de detalles algorítmicos, de definición y de implementación que puede haber).
+- Toma de decisiones en coordinación con terceros (en este caso, la cátedra) para llenar los blancos en la información provista por el _paper_.
+- Contacto con la librería `OpenSSL`, muy utilizada en la industria.
+
+---
+
+**Muchas gracias, Grupo 10.**
